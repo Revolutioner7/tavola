@@ -47,3 +47,7 @@ Compilación manual, solo si hiciera falta:
 ```
 npx eas-cli@latest build --profile preview --platform ios
 ```
+
+## Repositorio
+
+Código en GitHub: Revolutioner7/tavola, conectado al proyecto @harmat/tavola de Expo.
