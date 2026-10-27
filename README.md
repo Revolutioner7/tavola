@@ -2,6 +2,10 @@
 
 App para practicar italiano hablado con cuatro personajes de una familia inventada de Leverano.
 
+## Versión 0.3.1
+
+- Logo de Tavola como icono de la app y en la pantalla de carga, con fondo color mantel.
+
 ## Versión 0.3.0
 
 - Actualizaciones por el aire: los cambios que no tocan piezas nativas llegan al abrir la app, sin reinstalar.

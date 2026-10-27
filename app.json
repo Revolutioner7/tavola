@@ -3,7 +3,7 @@
     "name": "Tavola",
     "slug": "tavola",
     "owner": "harmat",
-    "version": "0.3.0",
+    "version": "0.3.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -22,7 +22,7 @@
     "android": {
       "package": "chat.tavola.app",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#FBF6EE",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -40,7 +40,16 @@
           "speechRecognitionPermission": "Tavola transcribe lo que dices para corregirte y medir tu fluidez."
         }
       ],
-      "expo-sqlite"
+      "expo-sqlite",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#FBF6EE"
+        }
+      ]
     ],
     "extra": {
       "eas": {
