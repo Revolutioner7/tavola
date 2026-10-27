@@ -1,0 +1,59 @@
+{
+  "expo": {
+    "name": "Tavola",
+    "slug": "tavola",
+    "owner": "harmat",
+    "version": "0.3.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "chat.tavola.app",
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "Tavola usa el micrófono para que puedas hablar en italiano con los personajes.",
+        "NSSpeechRecognitionUsageDescription": "Tavola transcribe lo que dices para corregirte y medir tu fluidez.",
+        "UIBackgroundModes": [
+          "audio"
+        ],
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "chat.tavola.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Tavola usa el micrófono para que puedas hablar en italiano con los personajes.",
+          "speechRecognitionPermission": "Tavola transcribe lo que dices para corregirte y medir tu fluidez."
+        }
+      ],
+      "expo-sqlite"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "571f6890-b680-4bae-a834-ee7d0aca7c03"
+      }
+    },
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/571f6890-b680-4bae-a834-ee7d0aca7c03",
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
+    }
+  }
+}

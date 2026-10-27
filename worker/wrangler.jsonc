@@ -1,0 +1,7 @@
+{
+  // Intermediario de Tavola. Las claves se guardan como secretos en Cloudflare,
+  // nunca en este archivo: ANTHROPIC_API_KEY y TAVOLA_APP_KEY.
+  "name": "tavola-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01"
+}

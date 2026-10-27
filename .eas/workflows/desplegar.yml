@@ -1,0 +1,38 @@
+# Cada vez que se sube código a GitHub (rama main):
+# - si el cambio solo toca la app por dentro (pantallas, textos, personajes),
+#   se envía al iPhone como actualización por el aire, sin reinstalar;
+# - si el cambio necesita una app nueva (módulos nativos, permisos), se compila
+#   y Expo avisa con el enlace para instalarla.
+name: Desplegar Tavola
+
+on:
+  push:
+    branches: ['main']
+
+jobs:
+  fingerprint:
+    name: Huella de la app
+    type: fingerprint
+  get_ios_build:
+    name: ¿Ya hay una app compatible?
+    needs: [fingerprint]
+    type: get-build
+    params:
+      fingerprint_hash: ${{ needs.fingerprint.outputs.ios_fingerprint_hash }}
+      profile: preview
+  build_ios:
+    name: Compilar app nueva
+    needs: [get_ios_build]
+    if: ${{ !needs.get_ios_build.outputs.build_id }}
+    type: build
+    params:
+      platform: ios
+      profile: preview
+  publish_ios_update:
+    name: Enviar actualización por el aire
+    needs: [get_ios_build]
+    if: ${{ needs.get_ios_build.outputs.build_id }}
+    type: update
+    params:
+      branch: preview
+      platform: ios
