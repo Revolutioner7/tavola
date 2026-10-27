@@ -1,9 +1,9 @@
 {
   "name": "tavola",
-  "version": "1.0.0",
+  "version": "0.3.2",
   "main": "index.ts",
   "dependencies": {
-    "expo": "~58.0.19",
+    "expo": "~58.0.20",
     "expo-speech": "~58.0.3",
     "expo-speech-recognition": "^58.0.0",
     "expo-splash-screen": "~58.0.11",

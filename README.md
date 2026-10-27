@@ -2,6 +2,10 @@
 
 App para practicar italiano hablado con cuatro personajes de una familia inventada de Leverano.
 
+## Versión 0.3.2
+
+- Corregido el cierre al abrir: Expo publicó hoy una pieza nueva (sistema de archivos) que necesitaba una base más reciente que la que teníamos. Ahora todas las piezas están alineadas con Expo 58.0.20.
+
 ## Versión 0.3.1
 
 - Logo de Tavola como icono de la app y en la pantalla de carga, con fondo color mantel.
