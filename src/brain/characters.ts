@@ -9,6 +9,7 @@ export type Character = {
   color: string;
   speechRate: number; // velocidad de la voz italiana (1 = normal en iOS)
   voiceGender: "f" | "m";
+  googleVoice: string; // voz natural de Google (Chirp 3 HD)
   sheet: string; // ficha que recibe el modelo
   opener: string; // primera frase si no hay memoria previa
 };
@@ -16,6 +17,7 @@ export type Character = {
 export const CHARACTERS: Character[] = [
   {
     id: "lucia",
+    googleVoice: "it-IT-Chirp3-HD-Gacrux",
     voiceGender: "f",
     name: "Nonna Lucia",
     age: 79,
@@ -33,6 +35,7 @@ Segreto (da rivelare pochissimo alla volta): custodisce un quaderno con le ricet
   },
   {
     id: "tonio",
+    googleVoice: "it-IT-Chirp3-HD-Charon",
     voiceGender: "m",
     name: "Zio Tonio",
     age: 57,
@@ -50,6 +53,7 @@ Segreto (da rivelare pochissimo alla volta): l'ulivo conteso in realtà l'ha pia
   },
   {
     id: "chiara",
+    googleVoice: "it-IT-Chirp3-HD-Kore",
     voiceGender: "f",
     name: "Chiara",
     age: 34,
@@ -67,6 +71,7 @@ Segreto (da rivelare pochissimo alla volta): le hanno offerto un lavoro a Milano
   },
   {
     id: "marco",
+    googleVoice: "it-IT-Chirp3-HD-Puck",
     voiceGender: "m",
     name: "Marco",
     age: 29,

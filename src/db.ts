@@ -52,6 +52,14 @@ db.execSync(`
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS looked_up_words (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    lemma TEXT NOT NULL,
+    sentence TEXT,
+    emoji TEXT,
+    explanation TEXT,
+    created_at TEXT NOT NULL
+  );
   CREATE TABLE IF NOT EXISTS monologues (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     run_id TEXT NOT NULL,
@@ -69,6 +77,11 @@ db.execSync(`
 `);
 
 const now = () => new Date().toISOString();
+
+// Palabras que Rodrigo ha tocado para entenderlas (para repasarlas más adelante)
+export function saveLookedUpWord(lemma: string, sentence: string, emoji: string, explanation: string) {
+  db.runSync("INSERT INTO looked_up_words (lemma, sentence, emoji, explanation, created_at) VALUES (?, ?, ?, ?, ?)", [lemma, sentence, emoji, explanation, now()]);
+}
 
 // Monólogos 4/3/2 ("Cuéntaselo a Nonna")
 export function addMonologueRound(r: {

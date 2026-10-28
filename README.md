@@ -2,6 +2,13 @@
 
 App para practicar italiano hablado con cuatro personajes de una familia inventada de Leverano.
 
+## Versión 0.5.0 (app nueva: incluye el reproductor de audio)
+
+- Voz natural de Google (Chirp 3 HD) para los cuatro personajes, a través del intermediario (`GET /v1/tts`, con caché por frase). Si no está disponible, se usa la voz del iPhone.
+- Sin traducciones: cada palabra del personaje se puede tocar y aparece explicada en italiano sencillo, con emoji, un ejemplo, el contrario y, si existe, un gesto italiano para mostrarla. Las palabras consultadas se guardan para repasarlas.
+- «Aiuto» ya no da pistas en castellano: el personaje reformula más fácil, da un ejemplo o dos opciones.
+- «¿Cómo se dice?» ya no muestra la frase en castellano, solo la versión italiana para repetirla.
+
 ## Versión 0.4 (actualización por el aire)
 
 - Corregido: respuestas vacías de los personajes y fallo del repaso. El modelo activaba su razonamiento interno por defecto y se comía el límite de respuesta; ahora va desactivado y, si llega vacía, se reintenta.

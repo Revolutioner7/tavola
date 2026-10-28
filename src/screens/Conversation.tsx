@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type ScrollViewInstance } from "react-native";
-import * as Speech from "expo-speech";
+import { speak as ttsSpeak, stopSpeaking } from "../tts";
+import { cleanWord, explainWord, type WordExplanation } from "../words";
 import {
   ExpoSpeechRecognitionModule,
   useSpeechRecognitionEvent,
@@ -36,7 +37,7 @@ const START_TOKEN = "[La conversación empieza ahora. Saluda y abre tú, retoman
 const SILENCE_TO_SEND_MS = 2200; // pausa tras la que se da tu turno por terminado
 const NO_SPEECH_MS = 15000; // si no dices nada en este tiempo, se deja de escuchar
 const NOTE_SIMPLER =
-  "[Nota de la app: Rodrigo ha necesitado traducir o escuchar más despacio tu último mensaje. Habla más sencillo y más corto: frases de pocas palabras y vocabulario muy frecuente.]";
+  "[Nota de la app: Rodrigo ha necesitado buscar palabras o escuchar más despacio tu último mensaje. Habla más sencillo y más corto: frases de pocas palabras y vocabulario muy frecuente.]";
 
 export default function Conversation({ characterId, onFinish, onCancel }: Props) {
   const character = getCharacter(characterId);
@@ -45,8 +46,8 @@ export default function Conversation({ characterId, onFinish, onCancel }: Props)
   const [draft, setDraft] = useState("");
   const [elapsed, setElapsed] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const [translations, setTranslations] = useState<Record<number, string>>({});
-  const [translating, setTranslating] = useState<number | null>(null);
+  const [lookup, setLookup] = useState<{ word: string; sentence: string; data?: WordExplanation; error?: string } | null>(null);
+  const resumeAfterLookup = useRef(false);
   const [helper, setHelper] = useState<{ es: string; it: string } | null>(null);
   const [helperBusy, setHelperBusy] = useState(false);
 
@@ -101,7 +102,7 @@ export default function Conversation({ characterId, onFinish, onCancel }: Props)
       alive.current = false;
       clearInterval(timer);
       stopSilenceTimer();
-      Speech.stop();
+      stopSpeaking();
       abortRecognition();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -181,29 +182,22 @@ export default function Conversation({ characterId, onFinish, onCancel }: Props)
   function speak(text: string, speed = 1, listenAfter = true) {
     abortRecognition();
     stopSilenceTimer();
-    Speech.stop();
     setPhase("speaking");
-    Speech.speak(text, {
-      language: "it-IT",
-      voice: voiceId.current,
-      rate: character.speechRate * 0.95 * speed,
+    ttsSpeak(text, {
+      googleVoice: character.googleVoice,
+      deviceVoice: voiceId.current,
+      rate: character.speechRate * speed,
       onDone: () => {
         if (!alive.current) return;
         if (listenAfter) setTimeout(() => alive.current && startListening(), 250);
         else setPhase("waiting");
-      },
-      onStopped: () => {
-        if (alive.current) setPhase((p) => (p === "speaking" ? "waiting" : p));
-      },
-      onError: () => {
-        if (alive.current) setPhase("waiting");
       },
     });
   }
 
   function startListening(lang: "it" | "es" = "it") {
     listenLang.current = lang;
-    Speech.stop();
+    stopSpeaking();
     setDraft("");
     setError(null);
     transcript.current = "";
@@ -219,6 +213,7 @@ export default function Conversation({ characterId, onFinish, onCancel }: Props)
       continuous: true,
       addsPunctuation: true,
       requiresOnDeviceRecognition: false,
+      iosCategory: { category: "playAndRecord", categoryOptions: ["defaultToSpeaker", "allowBluetooth"], mode: "default" },
     });
 
     stopSilenceTimer();
@@ -267,17 +262,15 @@ export default function Conversation({ characterId, onFinish, onCancel }: Props)
   }
 
   function speakHelper(it: string) {
+    abortRecognition();
+    stopSilenceTimer();
     setPhase("speaking");
-    Speech.stop();
-    Speech.speak(it, {
-      language: "it-IT",
-      voice: voiceId.current,
-      rate: character.speechRate * 0.8,
+    ttsSpeak(it, {
+      googleVoice: character.googleVoice,
+      deviceVoice: voiceId.current,
+      rate: character.speechRate * 0.85,
       onDone: () => {
         if (alive.current) setTimeout(() => alive.current && startListening("it"), 250);
-      },
-      onStopped: () => {
-        if (alive.current) setPhase((p) => (p === "speaking" ? "waiting" : p));
       },
     });
   }
@@ -316,28 +309,42 @@ export default function Conversation({ characterId, onFinish, onCancel }: Props)
     await characterTurn(history);
   }
 
-  async function translate(index: number, text: string) {
+  /** Tocar una palabra: explicación en italiano sencillo, emoji y gesto. Nunca traducción. */
+  async function openWord(raw: string, sentence: string) {
+    const word = cleanWord(raw);
+    if (!word) return;
     neededHelp.current = true;
-    if (translations[index]) return;
-    setTranslating(index);
+    resumeAfterLookup.current = phase === "listening" || phase === "speaking";
+    abortRecognition();
+    stopSilenceTimer();
+    stopSpeaking();
+    setPhase("waiting");
+    setLookup({ word, sentence });
     try {
-      const t = await callClaude({
-        model: MODEL_CONVERSATION,
-        systemStatic: "Traduce al castellano de España el texto italiano que te den. Devuelve solo la traducción, natural y fiel, sin comentarios.",
-        messages: [{ role: "user", content: text }],
-        maxTokens: 300,
-      });
-      setTranslations((prev) => ({ ...prev, [index]: t }));
-    } catch {
-      setTranslations((prev) => ({ ...prev, [index]: "No se ha podido traducir ahora." }));
+      const data = await explainWord(word, sentence);
+      setLookup((l) => (l && l.word === word ? { ...l, data } : l));
+    } catch (e: any) {
+      setLookup((l) => (l && l.word === word ? { ...l, error: "Non riesco a spiegarla adesso." } : l));
     }
-    setTranslating(null);
+  }
+
+  function closeWord() {
+    setLookup(null);
+    if (resumeAfterLookup.current) startListening();
+  }
+
+  function sayExplanation(d: WordExplanation) {
+    ttsSpeak(`${d.lemma}. ${d.spiegazione}. ${d.esempio}`, {
+      googleVoice: character.googleVoice,
+      deviceVoice: voiceId.current,
+      rate: 0.85,
+    });
   }
 
   function finish() {
     alive.current = false;
     stopSilenceTimer();
-    Speech.stop();
+    stopSpeaking();
     abortRecognition();
     if (!messagesRef.current.some((m) => m.role === "user")) {
       onCancel();
@@ -378,8 +385,17 @@ export default function Conversation({ characterId, onFinish, onCancel }: Props)
             </View>
           ) : (
             <View key={i} style={[styles.bubble, styles.charBubble, { borderLeftColor: character.color }]}>
-              <Text style={styles.bubbleText}>{m.content}</Text>
-              {translations[i] ? <Text style={styles.translation}>{translations[i]}</Text> : null}
+              <Text style={styles.bubbleText}>
+                {m.content.split(/(\s+)/).map((w, j) =>
+                  /\s+/.test(w) ? (
+                    w
+                  ) : (
+                    <Text key={j} onPress={() => openWord(w, m.content)} style={lookup && cleanWord(w) === lookup.word ? styles.wordOn : undefined}>
+                      {w}
+                    </Text>
+                  )
+                )}
+              </Text>
               <View style={styles.tools}>
                 <Pressable onPress={() => speak(m.content, 1, true)} hitSlop={8}>
                   <Text style={styles.tool}>↻ Repetir</Text>
@@ -393,9 +409,7 @@ export default function Conversation({ characterId, onFinish, onCancel }: Props)
                 >
                   <Text style={styles.tool}>🐢 Más despacio</Text>
                 </Pressable>
-                <Pressable onPress={() => translate(i, m.content)} hitSlop={8}>
-                  <Text style={styles.tool}>{translating === i ? "Traduciendo…" : "Traducir"}</Text>
-                </Pressable>
+                <Text style={styles.toolHint}>Toca una palabra</Text>
               </View>
             </View>
           )
@@ -419,9 +433,35 @@ export default function Conversation({ characterId, onFinish, onCancel }: Props)
           </>
         ) : (
           <>
+            {lookup && (
+              <View style={styles.wordCard}>
+                <View style={styles.wordHead}>
+                  <Text style={styles.wordTitle}>
+                    {lookup.data?.emoji ? `${lookup.data.emoji}  ` : ""}
+                    {lookup.data?.lemma || lookup.word}
+                  </Text>
+                  <Pressable onPress={closeWord} hitSlop={12}>
+                    <Text style={styles.wordClose}>✕</Text>
+                  </Pressable>
+                </View>
+                {!lookup.data && !lookup.error && <ActivityIndicator color={character.color} />}
+                {lookup.error && <Text style={styles.wordText}>{lookup.error}</Text>}
+                {lookup.data && (
+                  <>
+                    <Text style={styles.wordText}>{lookup.data.spiegazione}</Text>
+                    {lookup.data.esempio ? <Text style={styles.wordExample}>«{lookup.data.esempio}»</Text> : null}
+                    {lookup.data.contrario ? <Text style={styles.wordMeta}>↔ {lookup.data.contrario}</Text> : null}
+                    {lookup.data.gesto ? <Text style={styles.wordMeta}>🤌 {lookup.data.gesto}</Text> : null}
+                    <Pressable onPress={() => sayExplanation(lookup.data!)} hitSlop={8}>
+                      <Text style={styles.tool}>🔊 Ascolta</Text>
+                    </Pressable>
+                  </>
+                )}
+              </View>
+            )}
             {helper && (
               <View style={styles.helper}>
-                <Text style={styles.helperEs}>Querías decir: {helper.es}</Text>
+                <Text style={styles.helperEs}>Si dice così:</Text>
                 <Text style={styles.helperIt}>{helper.it}</Text>
                 <View style={styles.tools}>
                   <Pressable onPress={() => speakHelper(helper.it)} hitSlop={8}>
@@ -491,7 +531,15 @@ const styles = StyleSheet.create({
   charBubble: { backgroundColor: colors.card, alignSelf: "flex-start", borderLeftWidth: 4 },
   userBubble: { backgroundColor: colors.accent, alignSelf: "flex-end" },
   bubbleText: { fontSize: 17, lineHeight: 24, color: colors.ink },
-  translation: { marginTop: 8, fontSize: 15, lineHeight: 21, color: colors.muted, fontStyle: "italic" },
+  toolHint: { color: colors.muted, fontSize: 13 },
+  wordOn: { backgroundColor: colors.accentSoft },
+  wordCard: { backgroundColor: colors.card, borderRadius: radius, padding: 14, gap: 6, borderWidth: 1, borderColor: colors.accent },
+  wordHead: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  wordTitle: { fontSize: 22, fontWeight: "700", color: colors.ink },
+  wordClose: { fontSize: 18, color: colors.muted },
+  wordText: { fontSize: 17, lineHeight: 24, color: colors.ink },
+  wordExample: { fontSize: 15, color: colors.muted, fontStyle: "italic" },
+  wordMeta: { fontSize: 15, color: colors.ink },
   tools: { flexDirection: "row", gap: 16, marginTop: 10 },
   tool: { color: colors.accent, fontSize: 13, fontWeight: "600" },
   error: { color: colors.danger, marginTop: 8 },

@@ -3,7 +3,7 @@
     "name": "Tavola",
     "slug": "tavola",
     "owner": "harmat",
-    "version": "0.3.2",
+    "version": "0.5.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -48,6 +48,12 @@
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#FBF6EE"
+        }
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Tavola usa el micrófono para que puedas hablar en italiano con los personajes."
         }
       ]
     ],
