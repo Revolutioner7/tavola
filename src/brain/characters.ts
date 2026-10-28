@@ -8,6 +8,7 @@ export type Character = {
   difficulty: 1 | 2 | 3;
   color: string;
   speechRate: number; // velocidad de la voz italiana (1 = normal en iOS)
+  voiceGender: "f" | "m";
   sheet: string; // ficha que recibe el modelo
   opener: string; // primera frase si no hay memoria previa
 };
@@ -15,6 +16,7 @@ export type Character = {
 export const CHARACTERS: Character[] = [
   {
     id: "lucia",
+    voiceGender: "f",
     name: "Nonna Lucia",
     age: 79,
     tagline: "Cocina, el pueblo de antes y quién se casa con quién",
@@ -31,6 +33,7 @@ Segreto (da rivelare pochissimo alla volta): custodisce un quaderno con le ricet
   },
   {
     id: "tonio",
+    voiceGender: "m",
     name: "Zio Tonio",
     age: 57,
     tagline: "El olivar, el Lecce y su guerra con el vecino",
@@ -47,6 +50,7 @@ Segreto (da rivelare pochissimo alla volta): l'ulivo conteso in realtà l'ha pia
   },
   {
     id: "chiara",
+    voiceGender: "f",
     name: "Chiara",
     age: 34,
     tagline: "Trabajo, ciudades y Barcelona, donde hizo el Erasmus",
@@ -63,6 +67,7 @@ Segreto (da rivelare pochissimo alla volta): le hanno offerto un lavoro a Milano
   },
   {
     id: "marco",
+    voiceGender: "m",
     name: "Marco",
     age: 29,
     tagline: "Bicis, rutas por el Salento y conciertos de verano",

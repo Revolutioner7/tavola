@@ -1,13 +1,19 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { getSetting, setSetting } from "../db";
+import { hasGoodItalianVoice } from "../voice";
 import { colors, gap, radius } from "../theme";
 
 const LEVELS = ["A1", "A2", "B1", "B2", "C1"];
 
 export default function Settings({ onBack }: { onBack: () => void }) {
-  const [listening, setListening] = useState(getSetting("level_listening", "A2 (estimado)").slice(0, 2));
-  const [speaking, setSpeaking] = useState(getSetting("level_speaking", "A2 (estimado)").slice(0, 2));
+  const [listening, setListening] = useState(getSetting("level_listening", "A1 (estimado)").slice(0, 2));
+  const [speaking, setSpeaking] = useState(getSetting("level_speaking", "A1 (estimado)").slice(0, 2));
+
+  const [goodVoice, setGoodVoice] = useState(true);
+  useEffect(() => {
+    hasGoodItalianVoice().then(setGoodVoice);
+  }, []);
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
@@ -35,6 +41,18 @@ export default function Settings({ onBack }: { onBack: () => void }) {
           setSetting("level_speaking", v);
         }}
       />
+
+      <View style={[styles.card, !goodVoice && { borderColor: colors.accent }]}>
+        <Text style={styles.label}>Voz de los personajes</Text>
+        <Text style={styles.subtitle}>
+          {goodVoice
+            ? "Tienes instalada una voz italiana de buena calidad. Tavola la usa automáticamente."
+            : "Ahora los personajes usan la voz básica del iPhone, que suena a robot. Descarga gratis una voz mejor:"}
+        </Text>
+        <Text style={styles.subtitle}>
+          Ajustes del iPhone → Accesibilidad → Contenido leído → Voces → Italiano. Descarga las que pongan «Premium» (o «Mejorada»), una de mujer y una de hombre. Después cierra Tavola del todo y vuelve a abrirla.
+        </Text>
+      </View>
     </ScrollView>
   );
 }

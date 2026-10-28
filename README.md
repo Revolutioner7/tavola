@@ -2,6 +2,15 @@
 
 App para practicar italiano hablado con cuatro personajes de una familia inventada de Leverano.
 
+## Versión 0.4 (actualización por el aire)
+
+- Corregido: respuestas vacías de los personajes y fallo del repaso. El modelo activaba su razonamiento interno por defecto y se comía el límite de respuesta; ahora va desactivado y, si llega vacía, se reintenta.
+- Conversación sin botones: cuando el personaje termina, la app empieza a escucharte sola y, cuando haces una pausa de unos 2 segundos, envía tu respuesta. «Contestar ya» para interrumpir y «He terminado» para no esperar la pausa.
+- Debajo de cada frase del personaje: Repetir, Más despacio y Traducir. Si usas cualquiera de las dos últimas, el personaje simplifica su italiano.
+- «¿Cómo se dice?»: lo dices en castellano, la app te propone la frase en italiano, la oyes y la repites tú.
+- Voz: la app elige la mejor voz italiana instalada (Premium > Mejorada) y del género del personaje. En «Mi nivel» se explica cómo descargarla gratis.
+- Nivel inicial por defecto A1.
+
 ## Versión 0.3.2
 
 - Corregido el cierre al abrir: Expo publicó hoy una pieza nueva (sistema de archivos) que necesitaba una base más reciente que la que teníamos. Ahora todas las piezas están alineadas con Expo 58.0.20.
