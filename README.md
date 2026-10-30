@@ -2,6 +2,10 @@
 
 App para practicar italiano hablado con cuatro personajes de una familia inventada de Leverano.
 
+## Versión 0.5.1 (actualización por el aire)
+
+- Al abrir la app, si hay una versión nueva, se descarga y se aplica en ese momento (pantalla «Actualizando Tavola…»), sin tener que abrirla dos veces.
+
 ## Versión 0.5.0 (app nueva: incluye el reproductor de audio)
 
 - Voz natural de Google (Chirp 3 HD) para los cuatro personajes, a través del intermediario (`GET /v1/tts`, con caché por frase). Si no está disponible, se usa la voz del iPhone.

@@ -1,4 +1,7 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { ActivityIndicator, Text, View } from "react-native";
+import { applyUpdateIfAvailable } from "./src/updates";
+import { colors } from "./src/theme";
 import { StatusBar } from "expo-status-bar";
 import { CharacterId } from "./src/brain/characters";
 import Home from "./src/screens/Home";
@@ -19,6 +22,11 @@ type Route =
 export default function App() {
   const [route, setRoute] = useState<Route>({ name: "home" });
   const [homeKey, setHomeKey] = useState(0);
+  const [updating, setUpdating] = useState(false);
+
+  useEffect(() => {
+    applyUpdateIfAvailable(() => setUpdating(true));
+  }, []);
 
   const goHome = () => {
     setHomeKey((k) => k + 1); // refresca las estadísticas del inicio
@@ -55,6 +63,16 @@ export default function App() {
     case "monologue":
       screen = <Monologue key={route.key} onBack={goHome} />;
       break;
+  }
+
+  if (updating) {
+    return (
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.bg, gap: 12 }}>
+        <StatusBar style="dark" />
+        <ActivityIndicator color={colors.accent} />
+        <Text style={{ color: colors.muted, fontSize: 16 }}>Actualizando Tavola…</Text>
+      </View>
+    );
   }
 
   return (
