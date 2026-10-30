@@ -2,6 +2,10 @@
 
 App para practicar italiano hablado con cuatro personajes de una familia inventada de Leverano.
 
+## Versión 0.6.1 (actualización por el aire)
+
+- Juego «Completa la frase»: para las palabras sin imagen (sperare, comunque, magari…). Una frase italiana con un hueco y cuatro opciones. Al contestar se oye la frase completa y una explicación breve en italiano. Usa el mismo repaso espaciado que «Abbina le parole».
+
 ## Versión 0.6 (actualización por el aire)
 
 - Reformulación: el personaje repite bien dicho lo que dijiste mal, dentro de su respuesta y sin cortar. Debajo de tu frase aparece tu versión tachada y la buena en verde, y en la respuesta del personaje esas palabras salen subrayadas.

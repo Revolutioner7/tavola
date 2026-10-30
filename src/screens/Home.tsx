@@ -1,7 +1,7 @@
 import React, { useMemo } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { CHARACTERS, CharacterId } from "../brain/characters";
-import { recentSessions, openErrors, dueVocabCount } from "../db";
+import { recentSessions, openErrors, dueVocabCount, dueVocabAnyCount } from "../db";
 import { syllablesPerMinute } from "../fluency";
 import { colors, gap, radius } from "../theme";
 
@@ -9,12 +9,13 @@ type Props = {
   onStart: (id: CharacterId) => void;
   onMonologue: () => void;
   onGame: () => void;
+  onCloze: () => void;
   onErrors: () => void;
   onSettings: () => void;
 };
 
-export default function Home({ onStart, onMonologue, onGame, onErrors, onSettings }: Props) {
-  const { weekCount, lastRate, minutesWeek, openCount, dueWords } = useMemo(() => {
+export default function Home({ onStart, onMonologue, onGame, onCloze, onErrors, onSettings }: Props) {
+  const { weekCount, lastRate, minutesWeek, openCount, dueWords, dueAny } = useMemo(() => {
     const sessions = recentSessions(50);
     const weekAgo = Date.now() - 7 * 24 * 3600 * 1000;
     const week = sessions.filter((s) => new Date(s.started_at).getTime() > weekAgo);
@@ -25,6 +26,7 @@ export default function Home({ onStart, onMonologue, onGame, onErrors, onSetting
       lastRate: last ? syllablesPerMinute(last.user_syllables, last.user_seconds) : 0,
       openCount: openErrors().length,
       dueWords: dueVocabCount(),
+      dueAny: dueVocabAnyCount(),
     };
   }, []);
 
@@ -48,6 +50,13 @@ export default function Home({ onStart, onMonologue, onGame, onErrors, onSetting
         <Pressable style={({ pressed }) => [styles.game, pressed && styles.pressed]} onPress={onGame}>
           <Text style={styles.gameTitle}>🧩 Abbina le parole</Text>
           <Text style={styles.gameText}>{dueWords} parole da ripassare con le immagini</Text>
+        </Pressable>
+      )}
+
+      {dueAny > 0 && (
+        <Pressable style={({ pressed }) => [styles.game, pressed && styles.pressed]} onPress={onCloze}>
+          <Text style={styles.gameTitle}>✍️ Completa la frase</Text>
+          <Text style={styles.gameText}>{dueAny} parole da ripassare dentro una frase</Text>
         </Pressable>
       )}
 

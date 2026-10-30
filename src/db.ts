@@ -126,6 +126,19 @@ export function dueVocabCount(): number {
   return dueVocab(200).length;
 }
 
+/** Todas las palabras que tocan repasar, tengan imagen o no (para «Completa la frase»). */
+export function dueVocabAny(limit = 20): VocabRow[] {
+  return db.getAllSync<VocabRow>(
+    `SELECT id, lemma, emoji, image_url, explanation, correct, seen FROM vocab
+     WHERE due_at <= ? ORDER BY due_at ASC LIMIT ?`,
+    [now(), limit]
+  );
+}
+
+export function dueVocabAnyCount(): number {
+  return db.getFirstSync<{ n: number }>("SELECT COUNT(*) AS n FROM vocab WHERE due_at <= ?", [now()])?.n ?? 0;
+}
+
 /** Espaciado: cada acierto seguido aleja el siguiente repaso; un fallo lo trae a dentro de 10 minutos. */
 const INTERVALS_HOURS = [0.17, 24, 72, 168, 504, 1440];
 export function recordVocabResult(id: number, ok: boolean) {
