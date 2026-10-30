@@ -2,6 +2,13 @@
 
 App para practicar italiano hablado con cuatro personajes de una familia inventada de Leverano.
 
+## Versión 0.6 (actualización por el aire)
+
+- Reformulación: el personaje repite bien dicho lo que dijiste mal, dentro de su respuesta y sin cortar. Debajo de tu frase aparece tu versión tachada y la buena en verde, y en la respuesta del personaje esas palabras salen subrayadas.
+- Palabras en castellano: si no sabes una palabra y la dices en castellano, el personaje deduce cuál era y la usa en italiano en su respuesta.
+- Imágenes: las cosas concretas de las que habla el personaje (comida, objetos, lugares…) aparecen con foto de la Wikipedia italiana o emoji. Las tarjetas de palabras también llevan foto cuando la hay.
+- Juego «Abbina le parole»: empareja palabras italianas con su imagen. Usa las palabras que no sabías, las que dijiste mal y las que tocaste. Repaso espaciado: cada acierto aleja el siguiente repaso (1 día, 3, 7, 21, 60) y un fallo la trae a los 10 minutos.
+
 ## Versión 0.5.2 (actualización por el aire)
 
 - Fin de turno por silencio más fiable y más rápido: se da por terminado cuando no aparecen palabras nuevas en 1,5 s y el micrófono no oye voz desde hace 1 s (antes 2,2 s y se reiniciaba aunque no hubiera palabras nuevas).

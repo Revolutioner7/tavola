@@ -52,6 +52,18 @@ db.execSync(`
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS vocab (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    lemma TEXT NOT NULL UNIQUE,
+    emoji TEXT,
+    image_url TEXT,
+    explanation TEXT,
+    source TEXT,
+    correct INTEGER DEFAULT 0,
+    seen INTEGER DEFAULT 0,
+    due_at TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
   CREATE TABLE IF NOT EXISTS looked_up_words (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     lemma TEXT NOT NULL,
@@ -81,6 +93,47 @@ const now = () => new Date().toISOString();
 // Palabras que Rodrigo ha tocado para entenderlas (para repasarlas más adelante)
 export function saveLookedUpWord(lemma: string, sentence: string, emoji: string, explanation: string) {
   db.runSync("INSERT INTO looked_up_words (lemma, sentence, emoji, explanation, created_at) VALUES (?, ?, ?, ?, ?)", [lemma, sentence, emoji, explanation, now()]);
+}
+
+// Vocabulario para el juego de las palabras: las que no sabías, las que dijiste mal y las que tocaste
+export type VocabRow = { id: number; lemma: string; emoji: string | null; image_url: string | null; explanation: string | null; correct: number; seen: number };
+
+export function addVocab(w: { lemma: string; emoji?: string; imageUrl?: string; explanation?: string; source: string }) {
+  const lemma = w.lemma.trim().toLowerCase();
+  if (!lemma) return;
+  db.runSync(
+    `INSERT INTO vocab (lemma, emoji, image_url, explanation, source, due_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(lemma) DO UPDATE SET
+       emoji = COALESCE(NULLIF(excluded.emoji, ''), vocab.emoji),
+       image_url = COALESCE(NULLIF(excluded.image_url, ''), vocab.image_url),
+       explanation = COALESCE(NULLIF(excluded.explanation, ''), vocab.explanation),
+       due_at = MIN(vocab.due_at, excluded.due_at)`,
+    [lemma, w.emoji ?? "", w.imageUrl ?? "", w.explanation ?? "", w.source, now(), now()]
+  );
+}
+
+/** Palabras que tocan repasar ahora (con imagen o emoji para poder emparejarlas). */
+export function dueVocab(limit = 20): VocabRow[] {
+  return db.getAllSync<VocabRow>(
+    `SELECT id, lemma, emoji, image_url, explanation, correct, seen FROM vocab
+     WHERE due_at <= ? AND (COALESCE(emoji, '') <> '' OR COALESCE(image_url, '') <> '')
+     ORDER BY due_at ASC LIMIT ?`,
+    [now(), limit]
+  );
+}
+
+export function dueVocabCount(): number {
+  return dueVocab(200).length;
+}
+
+/** Espaciado: cada acierto seguido aleja el siguiente repaso; un fallo lo trae a dentro de 10 minutos. */
+const INTERVALS_HOURS = [0.17, 24, 72, 168, 504, 1440];
+export function recordVocabResult(id: number, ok: boolean) {
+  const row = db.getFirstSync<{ correct: number }>("SELECT correct FROM vocab WHERE id = ?", [id]);
+  const streak = ok ? (row?.correct ?? 0) + 1 : 0;
+  const hours = ok ? INTERVALS_HOURS[Math.min(streak, INTERVALS_HOURS.length - 1)] : INTERVALS_HOURS[0];
+  const due = new Date(Date.now() + hours * 3600 * 1000).toISOString();
+  db.runSync("UPDATE vocab SET correct = ?, seen = seen + 1, due_at = ? WHERE id = ?", [streak, due, id]);
 }
 
 // Monólogos 4/3/2 ("Cuéntaselo a Nonna")

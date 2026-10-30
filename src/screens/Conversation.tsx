@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type ScrollViewInstance } from "react-native";
+import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type ScrollViewInstance } from "react-native";
 import { speak as ttsSpeak, stopSpeaking } from "../tts";
 import { cleanWord, explainWord, type WordExplanation } from "../words";
+import { analyzeTurn, type TurnAnalysis } from "../turn";
 import {
   ExpoSpeechRecognitionModule,
   useSpeechRecognitionEvent,
@@ -50,6 +51,7 @@ export default function Conversation({ characterId, onFinish, onCancel }: Props)
   const [error, setError] = useState<string | null>(null);
   const [lookup, setLookup] = useState<{ word: string; sentence: string; data?: WordExplanation; error?: string } | null>(null);
   const resumeAfterLookup = useRef(false);
+  const [analyses, setAnalyses] = useState<Record<number, TurnAnalysis>>({});
   const [helper, setHelper] = useState<{ es: string; it: string } | null>(null);
   const [helperBusy, setHelperBusy] = useState(false);
 
@@ -179,6 +181,17 @@ export default function Conversation({ characterId, onFinish, onCancel }: Props)
       messagesRef.current = next;
       setMessages(next);
       speak(reply, 1, true);
+      // En paralelo a la voz: reformulación marcada, palabras nuevas e imágenes
+      const lastUser = history[history.length - 1];
+      if (lastUser?.role === "user") {
+        const said = clean(lastUser.content).trim();
+        if (said && said.toLowerCase() !== "aiuto") {
+          const idx = next.length - 1;
+          analyzeTurn(said, reply)
+            .then((a) => alive.current && setAnalyses((prev) => ({ ...prev, [idx]: a })))
+            .catch(() => {});
+        }
+      }
     } catch (e: any) {
       setError(e?.message ?? "No se ha podido contactar con la IA.");
       setPhase("waiting");
@@ -371,6 +384,19 @@ export default function Conversation({ characterId, onFinish, onCancel }: Props)
   }
 
   const clean = (s: string) => s.replace(/\n\n\[(QUEDA POCO|Nota de la app:[^\]]*)\]/g, "").replace(/\n\n\[QUEDA POCO\]/g, "");
+  /** Palabras de la respuesta del personaje que forman parte de la reformulación de lo que dijiste. */
+  function isRecastWord(index: number, w: string): boolean {
+    const better = analyses[index]?.correzione?.meglio;
+    if (!better) return false;
+    const target = cleanWord(w).toLowerCase();
+    if (target.length < 3) return false;
+    return better
+      .toLowerCase()
+      .split(/\s+/)
+      .map((x) => cleanWord(x))
+      .includes(target);
+  }
+
   const mm = String(Math.floor(elapsed / 60)).padStart(2, "0");
   const ss = String(elapsed % 60).padStart(2, "0");
   const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant");
@@ -390,8 +416,17 @@ export default function Conversation({ characterId, onFinish, onCancel }: Props)
       <ScrollView ref={scrollRef} style={{ flex: 1 }} contentContainerStyle={styles.chat} onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}>
         {messages.map((m, i) =>
           m.role === "user" ? (
-            <View key={i} style={[styles.bubble, styles.userBubble]}>
-              <Text style={[styles.bubbleText, { color: "#fff" }]}>{clean(m.content)}</Text>
+            <View key={i} style={styles.userBlock}>
+              <View style={[styles.bubble, styles.userBubble]}>
+                <Text style={[styles.bubbleText, { color: "#fff" }]}>{clean(m.content)}</Text>
+              </View>
+              {analyses[i + 1]?.correzione && (
+                <Text style={styles.recast}>
+                  <Text style={styles.recastSaid}>{analyses[i + 1]!.correzione!.detto}</Text>
+                  {"  →  "}
+                  <Text style={styles.recastBetter}>{analyses[i + 1]!.correzione!.meglio}</Text>
+                </Text>
+              )}
             </View>
           ) : (
             <View key={i} style={[styles.bubble, styles.charBubble, { borderLeftColor: character.color }]}>
@@ -400,12 +435,29 @@ export default function Conversation({ characterId, onFinish, onCancel }: Props)
                   /\s+/.test(w) ? (
                     w
                   ) : (
-                    <Text key={j} onPress={() => openWord(w, m.content)} style={lookup && cleanWord(w) === lookup.word ? styles.wordOn : undefined}>
+                    <Text
+                      key={j}
+                      onPress={() => openWord(w, m.content)}
+                      style={[
+                        lookup && cleanWord(w) === lookup.word ? styles.wordOn : undefined,
+                        isRecastWord(i, w) ? styles.recastWord : undefined,
+                      ]}
+                    >
                       {w}
                     </Text>
                   )
                 )}
               </Text>
+              {analyses[i]?.visual?.length ? (
+                <View style={styles.visuals}>
+                  {analyses[i].visual.map((v, k) => (
+                    <Pressable key={k} style={styles.visual} onPress={() => openWord(v.parola, m.content)}>
+                      {v.image ? <Image source={{ uri: v.image }} style={styles.visualImg} /> : <Text style={styles.visualEmoji}>{v.emoji}</Text>}
+                      <Text style={styles.visualWord}>{v.lemma}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              ) : null}
               <View style={styles.tools}>
                 <Pressable onPress={() => speak(m.content, 1, true)} hitSlop={8}>
                   <Text style={styles.tool}>↻ Repetir</Text>
@@ -458,6 +510,7 @@ export default function Conversation({ characterId, onFinish, onCancel }: Props)
                 {lookup.error && <Text style={styles.wordText}>{lookup.error}</Text>}
                 {lookup.data && (
                   <>
+                    {lookup.data.image ? <Image source={{ uri: lookup.data.image }} style={styles.wordImg} /> : null}
                     <Text style={styles.wordText}>{lookup.data.spiegazione}</Text>
                     {lookup.data.esempio ? <Text style={styles.wordExample}>«{lookup.data.esempio}»</Text> : null}
                     {lookup.data.contrario ? <Text style={styles.wordMeta}>↔ {lookup.data.contrario}</Text> : null}
@@ -542,11 +595,22 @@ const styles = StyleSheet.create({
   userBubble: { backgroundColor: colors.accent, alignSelf: "flex-end" },
   bubbleText: { fontSize: 17, lineHeight: 24, color: colors.ink },
   toolHint: { color: colors.muted, fontSize: 13 },
+  userBlock: { alignSelf: "flex-end", alignItems: "flex-end", maxWidth: "88%", gap: 4 },
+  recast: { fontSize: 14, color: colors.muted, textAlign: "right" },
+  recastSaid: { textDecorationLine: "line-through", color: colors.muted },
+  recastBetter: { color: colors.ok, fontWeight: "700" },
+  recastWord: { color: colors.ok, fontWeight: "700", textDecorationLine: "underline" },
+  visuals: { flexDirection: "row", gap: 8, marginTop: 10, flexWrap: "wrap" },
+  visual: { width: 84, alignItems: "center", gap: 4 },
+  visualImg: { width: 84, height: 84, borderRadius: 12, backgroundColor: colors.line },
+  visualEmoji: { fontSize: 44, lineHeight: 84, height: 84, textAlign: "center" },
+  visualWord: { fontSize: 13, color: colors.ink, fontWeight: "600" },
   wordOn: { backgroundColor: colors.accentSoft },
   wordCard: { backgroundColor: colors.card, borderRadius: radius, padding: 14, gap: 6, borderWidth: 1, borderColor: colors.accent },
   wordHead: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   wordTitle: { fontSize: 22, fontWeight: "700", color: colors.ink },
   wordClose: { fontSize: 18, color: colors.muted },
+  wordImg: { width: "100%", height: 140, borderRadius: 12, backgroundColor: colors.line },
   wordText: { fontSize: 17, lineHeight: 24, color: colors.ink },
   wordExample: { fontSize: 15, color: colors.muted, fontStyle: "italic" },
   wordMeta: { fontSize: 15, color: colors.ink },

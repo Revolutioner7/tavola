@@ -1,19 +1,20 @@
 import React, { useMemo } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { CHARACTERS, CharacterId } from "../brain/characters";
-import { recentSessions, openErrors } from "../db";
+import { recentSessions, openErrors, dueVocabCount } from "../db";
 import { syllablesPerMinute } from "../fluency";
 import { colors, gap, radius } from "../theme";
 
 type Props = {
   onStart: (id: CharacterId) => void;
   onMonologue: () => void;
+  onGame: () => void;
   onErrors: () => void;
   onSettings: () => void;
 };
 
-export default function Home({ onStart, onMonologue, onErrors, onSettings }: Props) {
-  const { weekCount, lastRate, minutesWeek, openCount } = useMemo(() => {
+export default function Home({ onStart, onMonologue, onGame, onErrors, onSettings }: Props) {
+  const { weekCount, lastRate, minutesWeek, openCount, dueWords } = useMemo(() => {
     const sessions = recentSessions(50);
     const weekAgo = Date.now() - 7 * 24 * 3600 * 1000;
     const week = sessions.filter((s) => new Date(s.started_at).getTime() > weekAgo);
@@ -23,6 +24,7 @@ export default function Home({ onStart, onMonologue, onErrors, onSettings }: Pro
       minutesWeek: Math.round(week.reduce((n, s) => n + s.user_seconds, 0) / 60),
       lastRate: last ? syllablesPerMinute(last.user_syllables, last.user_seconds) : 0,
       openCount: openErrors().length,
+      dueWords: dueVocabCount(),
     };
   }, []);
 
@@ -41,6 +43,13 @@ export default function Home({ onStart, onMonologue, onErrors, onSettings }: Pro
         <Text style={styles.drillTitle}>Cuéntaselo a Nonna</Text>
         <Text style={styles.drillText}>Cuenta lo mismo tres veces, cada vez más rápido: 2 minutos, 90 y 60 segundos.</Text>
       </Pressable>
+
+      {dueWords > 0 && (
+        <Pressable style={({ pressed }) => [styles.game, pressed && styles.pressed]} onPress={onGame}>
+          <Text style={styles.gameTitle}>🧩 Abbina le parole</Text>
+          <Text style={styles.gameText}>{dueWords} parole da ripassare con le immagini</Text>
+        </Pressable>
+      )}
 
       <Text style={styles.section}>Conversar</Text>
       {CHARACTERS.map((c) => (
@@ -91,6 +100,9 @@ const styles = StyleSheet.create({
   drill: { backgroundColor: colors.accent, borderRadius: radius, padding: 18, gap: 4 },
   drillTitle: { color: "#fff", fontSize: 18, fontWeight: "700" },
   drillText: { color: "#fff", opacity: 0.9, fontSize: 14, lineHeight: 20 },
+  game: { backgroundColor: colors.card, borderRadius: radius, padding: 16, gap: 4, borderWidth: 1.5, borderColor: colors.accent },
+  gameTitle: { fontSize: 17, fontWeight: "700", color: colors.ink },
+  gameText: { fontSize: 14, color: colors.muted },
   section: { fontSize: 13, fontWeight: "700", color: colors.muted, textTransform: "uppercase", letterSpacing: 0.5, marginTop: 4 },
   card: { flexDirection: "row", gap: 14, alignItems: "center", backgroundColor: colors.card, borderRadius: radius, padding: 16, borderWidth: 1, borderColor: colors.line },
   pressed: { opacity: 0.7 },

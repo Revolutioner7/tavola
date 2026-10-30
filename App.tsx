@@ -10,6 +10,7 @@ import Debrief from "./src/screens/Debrief";
 import ErrorBook from "./src/screens/ErrorBook";
 import Settings from "./src/screens/Settings";
 import Monologue from "./src/screens/Monologue";
+import WordGame from "./src/screens/WordGame";
 
 type Route =
   | { name: "home" }
@@ -17,7 +18,8 @@ type Route =
   | { name: "debrief"; result: ConversationResult }
   | { name: "errors" }
   | { name: "settings" }
-  | { name: "monologue"; key: number };
+  | { name: "monologue"; key: number }
+  | { name: "game"; key: number };
 
 export default function App() {
   const [route, setRoute] = useState<Route>({ name: "home" });
@@ -38,7 +40,7 @@ export default function App() {
   switch (route.name) {
     case "home":
       screen = (
-        <Home key={homeKey} onStart={startConversation} onMonologue={() => setRoute({ name: "monologue", key: Date.now() })} onErrors={() => setRoute({ name: "errors" })} onSettings={() => setRoute({ name: "settings" })} />
+        <Home key={homeKey} onStart={startConversation} onMonologue={() => setRoute({ name: "monologue", key: Date.now() })} onGame={() => setRoute({ name: "game", key: Date.now() })} onErrors={() => setRoute({ name: "errors" })} onSettings={() => setRoute({ name: "settings" })} />
       );
       break;
     case "conversation":
@@ -62,6 +64,9 @@ export default function App() {
       break;
     case "monologue":
       screen = <Monologue key={route.key} onBack={goHome} />;
+      break;
+    case "game":
+      screen = <WordGame key={route.key} onBack={goHome} />;
       break;
   }
 
