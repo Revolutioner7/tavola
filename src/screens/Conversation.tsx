@@ -34,7 +34,9 @@ type Props = {
 type Phase = "thinking" | "speaking" | "listening" | "waiting" | "typing";
 
 const START_TOKEN = "[La conversación empieza ahora. Saluda y abre tú, retomando algo de la última vez si la hubo.]";
-const SILENCE_TO_SEND_MS = 2200; // pausa tras la que se da tu turno por terminado
+const SILENCE_TO_SEND_MS = 1500; // tiempo sin palabras nuevas tras el que se da tu turno por terminado
+const QUIET_MS = 1000; // y además el micrófono no oye voz desde hace este tiempo
+const VOICE_LEVEL = 1.5; // nivel del micrófono (de -2 a 10) a partir del cual se considera que hablas
 const NO_SPEECH_MS = 15000; // si no dices nada en este tiempo, se deja de escuchar
 const NOTE_SIMPLER =
   "[Nota de la app: Rodrigo ha necesitado buscar palabras o escuchar más despacio tu último mensaje. Habla más sencillo y más corto: frases de pocas palabras y vocabulario muy frecuente.]";
@@ -55,6 +57,7 @@ export default function Conversation({ characterId, onFinish, onCancel }: Props)
   const startedAt = useRef(Date.now());
   const listenStartedAt = useRef(0);
   const lastResultAt = useRef(0);
+  const lastLoudAt = useRef(0);
   const transcript = useRef("");
   const lastSegments = useRef<ExpoSpeechRecognitionResultSegment[] | undefined>(undefined);
   const stats = useRef({ seconds: 0, syllables: 0, words: 0 });
@@ -112,10 +115,14 @@ export default function Conversation({ characterId, onFinish, onCancel }: Props)
   useSpeechRecognitionEvent("result", (event) => {
     const result = event.results[0];
     if (!result) return;
+    if (result.transcript !== transcript.current) lastResultAt.current = Date.now(); // solo cuenta si hay palabras nuevas
     transcript.current = result.transcript;
-    lastResultAt.current = Date.now();
     setDraft(result.transcript);
     if (result.segments?.length) lastSegments.current = result.segments;
+  });
+
+  useSpeechRecognitionEvent("volumechange", (event) => {
+    if (event.value > VOICE_LEVEL) lastLoudAt.current = Date.now();
   });
 
   useSpeechRecognitionEvent("end", () => {
@@ -189,7 +196,7 @@ export default function Conversation({ characterId, onFinish, onCancel }: Props)
       rate: character.speechRate * speed,
       onDone: () => {
         if (!alive.current) return;
-        if (listenAfter) setTimeout(() => alive.current && startListening(), 250);
+        if (listenAfter) setTimeout(() => alive.current && startListening(), 80);
         else setPhase("waiting");
       },
     });
@@ -204,6 +211,7 @@ export default function Conversation({ characterId, onFinish, onCancel }: Props)
     lastSegments.current = undefined;
     listenStartedAt.current = Date.now();
     lastResultAt.current = 0;
+    lastLoudAt.current = 0;
     endAction.current = "idle";
     setPhase("listening");
     recognizing.current = true;
@@ -214,12 +222,14 @@ export default function Conversation({ characterId, onFinish, onCancel }: Props)
       addsPunctuation: true,
       requiresOnDeviceRecognition: false,
       iosCategory: { category: "playAndRecord", categoryOptions: ["defaultToSpeaker", "allowBluetooth"], mode: "default" },
+      volumeChangeEventOptions: { enabled: true, intervalMillis: 150 },
     });
 
     stopSilenceTimer();
     silenceTimer.current = setInterval(() => {
       const now = Date.now();
-      if (transcript.current.trim() && lastResultAt.current && now - lastResultAt.current > SILENCE_TO_SEND_MS) {
+      const quiet = now - lastLoudAt.current > QUIET_MS;
+      if (transcript.current.trim() && lastResultAt.current && now - lastResultAt.current > SILENCE_TO_SEND_MS && quiet) {
         endAction.current = "send";
         stopSilenceTimer();
         ExpoSpeechRecognitionModule.stop();
@@ -270,7 +280,7 @@ export default function Conversation({ characterId, onFinish, onCancel }: Props)
       deviceVoice: voiceId.current,
       rate: character.speechRate * 0.85,
       onDone: () => {
-        if (alive.current) setTimeout(() => alive.current && startListening("it"), 250);
+        if (alive.current) setTimeout(() => alive.current && startListening("it"), 80);
       },
     });
   }

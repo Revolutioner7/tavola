@@ -2,6 +2,11 @@
 
 App para practicar italiano hablado con cuatro personajes de una familia inventada de Leverano.
 
+## Versión 0.5.2 (actualización por el aire)
+
+- Fin de turno por silencio más fiable y más rápido: se da por terminado cuando no aparecen palabras nuevas en 1,5 s y el micrófono no oye voz desde hace 1 s (antes 2,2 s y se reiniciaba aunque no hubiera palabras nuevas).
+- El personaje empieza a hablar antes: la respuesta se parte en frases, la primera se genera y suena enseguida mientras se preparan las siguientes.
+
 ## Versión 0.5.1 (actualización por el aire)
 
 - Al abrir la app, si hay una versión nueva, se descarga y se aplica en ese momento (pantalla «Actualizando Tavola…»), sin tener que abrirla dos veces.

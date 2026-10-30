@@ -4,14 +4,18 @@ import { API_URL, APP_KEY } from "./config";
 
 /**
  * Voz de los personajes.
- * Primero intenta la voz natural de Google (a través del intermediario de Cloudflare).
- * Si falla (sin conexión, sin configurar), usa la voz del iPhone para no dejar a nadie mudo.
+ * Usa la voz natural de Google (a través del intermediario de Cloudflare) y, si falla,
+ * la voz del iPhone para no dejar a nadie mudo.
+ *
+ * Para que el personaje empiece a hablar cuanto antes, el texto se parte en frases:
+ * se pide y se reproduce la primera (que tarda muy poco en generarse) mientras
+ * se van preparando las siguientes.
  */
 
-let player: AudioPlayer | null = null;
-let finishSub: { remove: () => void } | null = null;
-let speaking = false;
-let googleAvailable: boolean | null = null;
+let session = 0; // cada llamada a speak() abre una sesión; stopSpeaking() la invalida
+let players: AudioPlayer[] = [];
+let subs: { remove: () => void }[] = [];
+let googleFailed = false;
 
 type SpeakOpts = {
   googleVoice: string;
@@ -20,86 +24,114 @@ type SpeakOpts = {
   onDone?: () => void;
 };
 
-async function prepareAudio() {
-  try {
-    await setAudioModeAsync({ playsInSilentMode: true, allowsRecording: false, shouldRouteThroughEarpiece: false });
-  } catch {}
+export function splitSentences(text: string): string[] {
+  const parts = text
+    .split(/(?<=[.!?…])\s+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  // Une frases muy cortas con la siguiente para que la voz no suene a trozos
+  const out: string[] = [];
+  for (const p of parts) {
+    if (out.length && out[out.length - 1].length < 12) out[out.length - 1] += ` ${p}`;
+    else out.push(p);
+  }
+  return out.length ? out : [text];
+}
+
+function cleanup() {
+  subs.forEach((s) => {
+    try {
+      s.remove();
+    } catch {}
+  });
+  subs = [];
+  players.forEach((p) => {
+    try {
+      p.pause();
+      p.remove();
+    } catch {}
+  });
+  players = [];
 }
 
 export function stopSpeaking() {
-  speaking = false;
-  try {
-    finishSub?.remove();
-  } catch {}
-  finishSub = null;
-  try {
-    player?.pause();
-    player?.remove();
-  } catch {}
-  player = null;
+  session++;
+  cleanup();
   Speech.stop();
+}
+
+function ttsUri(text: string, voice: string, rate: number) {
+  return `${API_URL}/v1/tts?voice=${encodeURIComponent(voice)}&rate=${rate.toFixed(2)}&text=${encodeURIComponent(text)}`;
+}
+
+function deviceSpeak(text: string, opts: SpeakOpts, mySession: number, onEnd: () => void) {
+  Speech.speak(text, {
+    language: "it-IT",
+    voice: opts.deviceVoice,
+    rate: 0.95 * (opts.rate ?? 1),
+    onDone: () => {
+      if (mySession === session) onEnd();
+    },
+    onError: () => {
+      if (mySession === session) onEnd();
+    },
+  });
 }
 
 export async function speak(text: string, opts: SpeakOpts) {
   stopSpeaking();
-  speaking = true;
+  const mySession = session;
   const rate = opts.rate ?? 1;
-  const done = () => {
-    if (!speaking) return;
-    speaking = false;
+  const finish = () => {
+    if (mySession !== session) return;
+    cleanup();
     opts.onDone?.();
   };
 
-  if (googleAvailable !== false) {
-    try {
-      await prepareAudio();
-      const uri = `${API_URL}/v1/tts?voice=${encodeURIComponent(opts.googleVoice)}&rate=${rate.toFixed(2)}&text=${encodeURIComponent(text)}`;
-      const p = createAudioPlayer({ uri, headers: { "x-tavola-key": APP_KEY } });
-      player = p;
-      let started = false;
-      await new Promise<void>((resolve, reject) => {
-        const timeout = setTimeout(() => !started && reject(new Error("timeout")), 8000);
-        finishSub = p.addListener("playbackStatusUpdate", (s: any) => {
-          if (s.isLoaded && !started) {
-            started = true;
-            clearTimeout(timeout);
-            resolve();
-          }
-          if (s.didJustFinish) done();
-        });
-        p.play();
-      });
-      googleAvailable = true;
-      return;
-    } catch {
-      // Sin voz de Google: se pasa a la del iPhone
-      if (googleAvailable === null) googleAvailable = false;
-      try {
-        player?.remove();
-      } catch {}
-      player = null;
-      if (!speaking) return;
-    }
+  if (googleFailed) {
+    deviceSpeak(text, opts, mySession, finish);
+    return;
   }
 
-  Speech.speak(text, {
-    language: "it-IT",
-    voice: opts.deviceVoice,
-    rate: 0.95 * rate,
-    onDone: done,
-    onStopped: () => {},
-    onError: done,
-  });
-}
-
-/** Comprueba si el intermediario tiene la voz de Google configurada. */
-export async function checkGoogleVoice(): Promise<boolean> {
   try {
-    const r = await fetch(`${API_URL}/health`);
-    const j = await r.json();
-    googleAvailable = Boolean(j.tts);
-  } catch {
-    googleAvailable = null;
-  }
-  return Boolean(googleAvailable);
+    await setAudioModeAsync({ playsInSilentMode: true, allowsRecording: false, shouldRouteThroughEarpiece: false });
+  } catch {}
+  if (mySession !== session) return;
+
+  const sentences = splitSentences(text);
+  const make = (i: number) => {
+    if (i >= sentences.length || players[i]) return;
+    players[i] = createAudioPlayer({ uri: ttsUri(sentences[i], opts.googleVoice, rate), headers: { "x-tavola-key": APP_KEY } });
+  };
+
+  const playAt = (i: number) => {
+    if (mySession !== session) return;
+    if (i >= sentences.length) return finish();
+    make(i);
+    make(i + 1); // prepara la siguiente mientras suena esta
+    const p = players[i];
+    let started = false;
+    const timeout = setTimeout(() => {
+      if (started || mySession !== session) return;
+      // Google no responde: el resto lo dice la voz del iPhone
+      googleFailed = i === 0;
+      cleanup();
+      deviceSpeak(sentences.slice(i).join(" "), opts, mySession, finish);
+    }, 6000);
+    const sub = p.addListener("playbackStatusUpdate", (s: any) => {
+      if (mySession !== session) return;
+      if (s.isLoaded && !started) {
+        started = true;
+        clearTimeout(timeout);
+      }
+      if (s.didJustFinish) {
+        sub.remove();
+        playAt(i + 1);
+      }
+    });
+    subs.push(sub);
+    p.play();
+  };
+
+  playAt(0);
 }
