@@ -9,6 +9,7 @@ import {
   type ExpoSpeechRecognitionResultSegment,
 } from "expo-speech-recognition";
 import { CharacterId, getCharacter } from "../brain/characters";
+import { getTappa } from "../brain/path";
 import { conversationSystemDynamic, conversationSystemStatic, TaskType } from "../brain/prompts";
 import { callClaude, ChatMessage } from "../api";
 import { MODEL_CONVERSATION, WRAP_UP_MINUTES } from "../config";
@@ -20,6 +21,7 @@ import { colors, gap, radius } from "../theme";
 export type ConversationResult = {
   sessionId: number;
   characterId: CharacterId;
+  tappaId?: string;
   messages: ChatMessage[];
   userSeconds: number;
   userSyllables: number;
@@ -28,6 +30,7 @@ export type ConversationResult = {
 
 type Props = {
   characterId: CharacterId;
+  tappaId?: string;
   onFinish: (result: ConversationResult) => void;
   onCancel: () => void;
 };
@@ -42,8 +45,9 @@ const NO_SPEECH_MS = 15000; // si no dices nada en este tiempo, se deja de escuc
 const NOTE_SIMPLER =
   "[Nota de la app: Rodrigo ha necesitado buscar palabras o escuchar más despacio tu último mensaje. Habla más sencillo y más corto: frases de pocas palabras y vocabulario muy frecuente.]";
 
-export default function Conversation({ characterId, onFinish, onCancel }: Props) {
+export default function Conversation({ characterId, tappaId, onFinish, onCancel }: Props) {
   const character = getCharacter(characterId);
+  const tappa = getTappa(tappaId);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [phase, setPhase] = useState<Phase>("thinking");
   const [draft, setDraft] = useState("");
@@ -86,6 +90,7 @@ export default function Conversation({ characterId, onFinish, onCancel }: Props)
     levelListening: getSetting("level_listening", "A1 (estimado)"),
     levelSpeaking: getSetting("level_speaking", "A1 (estimado)"),
     task,
+    mission: tappa?.steer,
   });
 
   useEffect(() => {
@@ -376,6 +381,7 @@ export default function Conversation({ characterId, onFinish, onCancel }: Props)
     onFinish({
       sessionId: sessionId.current,
       characterId,
+      tappaId,
       messages: messagesRef.current,
       userSeconds: stats.current.seconds,
       userSyllables: stats.current.syllables,
@@ -412,6 +418,13 @@ export default function Conversation({ characterId, onFinish, onCancel }: Props)
           {mm}:{ss}
         </Text>
       </View>
+      {tappa && (
+        <View style={styles.mission}>
+          <Text style={styles.missionText}>
+            {tappa.emoji} {tappa.mission}
+          </Text>
+        </View>
+      )}
 
       <ScrollView ref={scrollRef} style={{ flex: 1 }} contentContainerStyle={styles.chat} onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}>
         {messages.map((m, i) =>
@@ -587,6 +600,8 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   header: { paddingTop: 60, paddingHorizontal: gap, paddingBottom: 12, flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderBottomWidth: 1, borderBottomColor: colors.line },
   headerAction: { color: colors.accent, fontWeight: "600", fontSize: 16 },
+  mission: { backgroundColor: colors.accentSoft, paddingHorizontal: gap, paddingVertical: 10 },
+  missionText: { fontSize: 14, lineHeight: 19, color: colors.ink },
   headerTitle: { fontSize: 18, fontWeight: "700", color: colors.ink },
   timer: { fontVariant: ["tabular-nums"], color: colors.muted, fontSize: 16 },
   chat: { padding: gap, gap: 10 },

@@ -1,12 +1,13 @@
 import React, { useMemo } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { CHARACTERS, CharacterId } from "../brain/characters";
-import { recentSessions, openErrors, dueVocabCount, dueVocabAnyCount } from "../db";
+import { CHARACTERS, CharacterId, getCharacter } from "../brain/characters";
+import { TAPPE, currentIndex, unlockedCharacters } from "../brain/path";
+import { recentSessions, openErrors, dueVocabCount, dueVocabAnyCount, completedTappe } from "../db";
 import { syllablesPerMinute } from "../fluency";
 import { colors, gap, radius } from "../theme";
 
 type Props = {
-  onStart: (id: CharacterId) => void;
+  onStart: (id: CharacterId, tappaId?: string) => void;
   onMonologue: () => void;
   onGame: () => void;
   onCloze: () => void;
@@ -15,7 +16,8 @@ type Props = {
 };
 
 export default function Home({ onStart, onMonologue, onGame, onCloze, onErrors, onSettings }: Props) {
-  const { weekCount, lastRate, minutesWeek, openCount, dueWords, dueAny } = useMemo(() => {
+  const { weekCount, lastRate, minutesWeek, openCount, dueWords, dueAny, current, unlocked } = useMemo(() => {
+    const done = completedTappe();
     const sessions = recentSessions(50);
     const weekAgo = Date.now() - 7 * 24 * 3600 * 1000;
     const week = sessions.filter((s) => new Date(s.started_at).getTime() > weekAgo);
@@ -27,6 +29,8 @@ export default function Home({ onStart, onMonologue, onGame, onCloze, onErrors, 
       openCount: openErrors().length,
       dueWords: dueVocabCount(),
       dueAny: dueVocabAnyCount(),
+      current: currentIndex(done),
+      unlocked: unlockedCharacters(done),
     };
   }, []);
 
@@ -39,6 +43,39 @@ export default function Home({ onStart, onMonologue, onGame, onCloze, onErrors, 
         <Stat label="Sesiones esta semana" value={`${weekCount} / 3`} />
         <Stat label="Minutos hablados" value={`${minutesWeek}`} />
         <Stat label="Sílabas por minuto" value={lastRate ? `${lastRate}` : "–"} />
+      </View>
+
+      <Text style={styles.section}>Il tuo viaggio · {Math.min(current, TAPPE.length)} / {TAPPE.length}</Text>
+      <View style={styles.path}>
+        {TAPPE.map((t, i) => {
+          const done = i < current;
+          const isCurrent = i === current;
+          const known = unlocked.includes(t.characterId);
+          const who = known ? getCharacter(t.characterId) : undefined;
+          const step = (
+            <View style={[styles.step, isCurrent && styles.stepCurrent, !done && !isCurrent && styles.stepLocked]}>
+              <View style={[styles.dot, { backgroundColor: done ? colors.ok : isCurrent ? who?.color ?? colors.accent : colors.line }]}>
+                <Text style={styles.dotText}>{done ? "✓" : isCurrent ? t.emoji : "🔒"}</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.stepTitle, !done && !isCurrent && { color: colors.muted }]}>{done || isCurrent ? t.title : `Etapa ${i + 1}`}</Text>
+                <Text style={styles.stepWho}>{who ? who.name : "Personaje por descubrir"}</Text>
+                {isCurrent && <Text style={styles.stepMission}>{t.mission}</Text>}
+                {isCurrent && <Text style={styles.stepGo}>Empezar ›</Text>}
+              </View>
+            </View>
+          );
+          // Solo se muestran las etapas hechas, la actual y las dos siguientes
+          if (i > current + 2) return null;
+          return isCurrent ? (
+            <Pressable key={t.id} onPress={() => onStart(t.characterId, t.id)} style={({ pressed }) => pressed && styles.pressed}>
+              {step}
+            </Pressable>
+          ) : (
+            <View key={t.id}>{step}</View>
+          );
+        })}
+        {current >= TAPPE.length && <Text style={styles.stepMission}>Has terminado el recorrido. Benvenuto in famiglia! 🇮🇹</Text>}
       </View>
 
       <Pressable style={({ pressed }) => [styles.drill, pressed && styles.pressed]} onPress={onMonologue}>
@@ -60,8 +97,8 @@ export default function Home({ onStart, onMonologue, onGame, onCloze, onErrors, 
         </Pressable>
       )}
 
-      <Text style={styles.section}>Conversar</Text>
-      {CHARACTERS.map((c) => (
+      <Text style={styles.section}>Conversación libre</Text>
+      {CHARACTERS.filter((c) => unlocked.includes(c.id)).map((c) => (
         <Pressable key={c.id} style={({ pressed }) => [styles.card, pressed && styles.pressed]} onPress={() => onStart(c.id)}>
           <View style={[styles.avatar, { backgroundColor: c.color }]}>
             <Text style={styles.avatarText}>{c.name.replace("Nonna ", "").replace("Zio ", "")[0]}</Text>
@@ -113,6 +150,16 @@ const styles = StyleSheet.create({
   gameTitle: { fontSize: 17, fontWeight: "700", color: colors.ink },
   gameText: { fontSize: 14, color: colors.muted },
   section: { fontSize: 13, fontWeight: "700", color: colors.muted, textTransform: "uppercase", letterSpacing: 0.5, marginTop: 4 },
+  path: { gap: 8 },
+  step: { flexDirection: "row", gap: 12, alignItems: "flex-start", backgroundColor: colors.card, borderRadius: radius, padding: 12, borderWidth: 1, borderColor: colors.line },
+  stepCurrent: { borderWidth: 2, borderColor: colors.accent, padding: 14 },
+  stepLocked: { opacity: 0.55 },
+  dot: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
+  dotText: { fontSize: 18, color: "#fff", fontWeight: "700" },
+  stepTitle: { fontSize: 16, fontWeight: "700", color: colors.ink },
+  stepWho: { fontSize: 13, color: colors.muted },
+  stepMission: { fontSize: 14, color: colors.ink, lineHeight: 20, marginTop: 6 },
+  stepGo: { fontSize: 15, fontWeight: "700", color: colors.accent, marginTop: 6 },
   card: { flexDirection: "row", gap: 14, alignItems: "center", backgroundColor: colors.card, borderRadius: radius, padding: 16, borderWidth: 1, borderColor: colors.line },
   pressed: { opacity: 0.7 },
   avatar: { width: 52, height: 52, borderRadius: 26, alignItems: "center", justifyContent: "center" },

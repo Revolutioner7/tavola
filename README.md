@@ -2,6 +2,12 @@
 
 App para practicar italiano hablado con cuatro personajes de una familia inventada de Leverano.
 
+## Versión 0.7 (actualización por el aire)
+
+- Recorrido «Il tuo viaggio»: 12 etapas, cada una con una misión de conversación (presentarte, decir qué te gusta comer, explicar un plato, tu barrio, tu trabajo…). El personaje lleva la charla hacia la misión sin decirlo y el repaso final decide si la has cumplido. Si no, puedes intentarlo otra vez.
+- Personajes por desbloquear: al principio solo está Nonna Lucia. Chiara aparece en la etapa 4, Marco en la 7 y Zio Tonio (el más difícil) en la 10. En «Conversación libre» solo salen los que ya conoces.
+- Las etapas están en `src/brain/path.ts`.
+
 ## Versión 0.6.1 (actualización por el aire)
 
 - Juego «Completa la frase»: para las palabras sin imagen (sperare, comunque, magari…). Una frase italiana con un hueco y cuatro opciones. Al contestar se oye la frase completa y una explicación breve en italiano. Usa el mismo repaso espaciado que «Abbina le parole».

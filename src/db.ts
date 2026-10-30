@@ -9,6 +9,10 @@ try {
 } catch {}
 
 db.execSync(`
+  CREATE TABLE IF NOT EXISTS path_progress (
+    tappa_id TEXT PRIMARY KEY,
+    completed_at TEXT NOT NULL
+  );
   CREATE TABLE IF NOT EXISTS user_facts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     text TEXT NOT NULL,
@@ -264,4 +268,13 @@ export function addUsefulPhrases(sessionId: number, phrases: string[]) {
 }
 export function recentPhrases(limit = 50): string[] {
   return db.getAllSync<{ text: string }>("SELECT text FROM useful_phrases ORDER BY id DESC LIMIT ?", [limit]).map((r) => r.text);
+}
+
+// Recorrido: etapas superadas
+export function completedTappe(): Set<string> {
+  return new Set(db.getAllSync<{ tappa_id: string }>("SELECT tappa_id FROM path_progress").map((r) => r.tappa_id));
+}
+
+export function completeTappa(id: string) {
+  db.runSync("INSERT OR IGNORE INTO path_progress (tappa_id, completed_at) VALUES (?, ?)", [id, now()]);
 }

@@ -15,7 +15,7 @@ import ClozeGame from "./src/screens/ClozeGame";
 
 type Route =
   | { name: "home" }
-  | { name: "conversation"; characterId: CharacterId; key: number }
+  | { name: "conversation"; characterId: CharacterId; tappaId?: string; key: number }
   | { name: "debrief"; result: ConversationResult }
   | { name: "errors" }
   | { name: "settings" }
@@ -36,7 +36,7 @@ export default function App() {
     setHomeKey((k) => k + 1); // refresca las estadísticas del inicio
     setRoute({ name: "home" });
   };
-  const startConversation = (characterId: CharacterId) => setRoute({ name: "conversation", characterId, key: Date.now() });
+  const startConversation = (characterId: CharacterId, tappaId?: string) => setRoute({ name: "conversation", characterId, tappaId, key: Date.now() });
 
   let screen: React.ReactNode;
   switch (route.name) {
@@ -50,13 +50,14 @@ export default function App() {
         <Conversation
           key={route.key}
           characterId={route.characterId}
+          tappaId={route.tappaId}
           onFinish={(result) => setRoute({ name: "debrief", result })}
           onCancel={goHome}
         />
       );
       break;
     case "debrief":
-      screen = <Debrief result={route.result} onRepeat={() => startConversation(route.result.characterId)} onHome={goHome} />;
+      screen = <Debrief result={route.result} onRepeat={() => startConversation(route.result.characterId, route.result.tappaId)} onHome={goHome} onNext={goHome} />;
       break;
     case "errors":
       screen = <ErrorBook onBack={goHome} />;

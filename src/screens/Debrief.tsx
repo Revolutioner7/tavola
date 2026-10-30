@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { getCharacter } from "../brain/characters";
+import { characterUnlockedBy, getTappa } from "../brain/path";
 import { findInterference } from "../brain/interferences";
 import { debriefSystem, debriefUserMessage } from "../brain/prompts";
 import { callClaude, parseJson } from "../api";
@@ -10,6 +11,7 @@ import {
   addError,
   addUsefulPhrases,
   addUserFacts,
+  completeTappa,
   errorBookForPrompt,
   errorCountByCode,
   finishSession,
@@ -25,16 +27,19 @@ type DebriefData = {
   frases_utiles: string[];
   datos_nuevos_usuario: string[];
   resumen_personaje: string;
+  mision?: { cumplida: boolean; comentario: string };
 };
 
 type Props = {
   result: ConversationResult;
   onRepeat: () => void;
   onHome: () => void;
+  onNext: () => void;
 };
 
-export default function Debrief({ result, onRepeat, onHome }: Props) {
+export default function Debrief({ result, onRepeat, onHome, onNext }: Props) {
   const character = getCharacter(result.characterId);
+  const tappa = getTappa(result.tappaId);
   const [data, setData] = useState<DebriefData | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -47,7 +52,7 @@ export default function Debrief({ result, onRepeat, onHome }: Props) {
     try {
       const text = await callClaude({
         model: MODEL_DEBRIEF,
-        systemStatic: debriefSystem(),
+        systemStatic: debriefSystem(tappa),
         messages: [{ role: "user", content: debriefUserMessage({ characterName: character.name, transcript, errorBook: errorBookForPrompt() }) }],
         maxTokens: 1200,
       });
@@ -62,6 +67,7 @@ export default function Debrief({ result, onRepeat, onHome }: Props) {
       addUsefulPhrases(result.sessionId, parsed.frases_utiles || []);
       addUserFacts(parsed.datos_nuevos_usuario || []);
       addCharacterMemory(result.characterId, parsed.resumen_personaje || "");
+      if (tappa && parsed.mision?.cumplida) completeTappa(tappa.id);
       setData(parsed);
     } catch (e: any) {
       setError(e?.message ?? "No se ha podido hacer el repaso.");
@@ -100,6 +106,18 @@ export default function Debrief({ result, onRepeat, onHome }: Props) {
           <Pressable style={styles.ghost} onPress={run}>
             <Text style={styles.ghostText}>Reintentar</Text>
           </Pressable>
+        </View>
+      )}
+
+      {data && tappa && data.mision && (
+        <View style={[styles.card, styles.missionCard, data.mision.cumplida ? styles.missionOk : styles.missionNo]}>
+          <Text style={styles.missionTitle}>
+            {data.mision.cumplida ? `🎉 Etapa superada: ${tappa.title}` : `🤏 Casi: ${tappa.title}`}
+          </Text>
+          {!!data.mision.comentario && <Text style={styles.body}>{data.mision.comentario}</Text>}
+          {data.mision.cumplida && characterUnlockedBy(tappa.id) && (
+            <Text style={styles.unlock}>Nuevo personaje en tu mesa: {getCharacter(characterUnlockedBy(tappa.id)!).name}</Text>
+          )}
         </View>
       )}
 
@@ -155,9 +173,15 @@ export default function Debrief({ result, onRepeat, onHome }: Props) {
             Las correcciones las hace una IA y pueden equivocarse. Si una te suena rara, márcala como dudosa en el libro de errores y pregúntaselo a Giulia.
           </Text>
 
-          <Pressable style={styles.primary} onPress={onRepeat}>
-            <Text style={styles.primaryText}>Repetir la conversación</Text>
-          </Pressable>
+          {tappa && data.mision?.cumplida ? (
+            <Pressable style={styles.primary} onPress={onNext}>
+              <Text style={styles.primaryText}>Ver mi recorrido</Text>
+            </Pressable>
+          ) : (
+            <Pressable style={styles.primary} onPress={onRepeat}>
+              <Text style={styles.primaryText}>{tappa ? "Intentar la etapa otra vez" : "Repetir la conversación"}</Text>
+            </Pressable>
+          )}
           <Pressable style={styles.ghost} onPress={onHome}>
             <Text style={styles.ghostText}>Volver al inicio</Text>
           </Pressable>
@@ -197,6 +221,11 @@ const styles = StyleSheet.create({
   contrast: { marginTop: 6, backgroundColor: colors.accentSoft, borderRadius: 12, padding: 12, gap: 4 },
   contrastLabel: { fontSize: 12, fontWeight: "700", color: colors.accent },
   phrase: { fontSize: 17, color: colors.ink, paddingVertical: 2 },
+  missionCard: { borderWidth: 2 },
+  missionOk: { borderColor: colors.ok },
+  missionNo: { borderColor: colors.warn },
+  missionTitle: { fontSize: 18, fontWeight: "700", color: colors.ink },
+  unlock: { fontSize: 15, fontWeight: "700", color: colors.accent, marginTop: 4 },
   note: { fontSize: 12, color: colors.muted, lineHeight: 17 },
   errorText: { color: colors.danger },
   primary: { backgroundColor: colors.accent, borderRadius: radius, padding: 16, alignItems: "center" },

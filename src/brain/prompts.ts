@@ -39,6 +39,7 @@ export function conversationSystemDynamic(opts: {
   levelSpeaking: string;
   task: TaskType;
   topic?: string;
+  mission?: string;
 }): string {
   const facts = opts.userFacts.length ? opts.userFacts.map((f) => `- ${f}`).join("\n") : "- Todavía no sabes nada de él.";
   const memory = opts.characterMemory.length
@@ -52,10 +53,18 @@ ${memory}
 
 Su nivel actual: escuchar ${opts.levelListening}, hablar ${opts.levelSpeaking}.
 Tipo de tarea de hoy: ${opts.task}.
-${opts.topic ? `Tema de partida: ${opts.topic}` : "Tema de partida: libre, empieza por algo de tus temas o retoma la última conversación."}`;
+${opts.topic ? `Tema de partida: ${opts.topic}` : "Tema de partida: libre, empieza por algo de tus temas o retoma la última conversación."}${
+    opts.mission
+      ? `
+
+OBJETIVO DE HOY (Rodrigo está en una etapa de su recorrido)
+${opts.mission}
+Lleva la conversación hacia ahí con naturalidad, con preguntas de una en una, sin decir nunca que es un ejercicio ni una misión. Si se queda atascado, dale una pista sencilla en italiano o dos opciones para elegir. Cuando lo haya conseguido, sigue charlando con normalidad.`
+      : ""
+  }`;
 }
 
-export function debriefSystem(): string {
+export function debriefSystem(mission?: { mission: string; check: string }): string {
   return `Eres un profesor de italiano experto en hablantes de castellano que piensan en portugués de Brasil. Revisas conversaciones habladas de Rodrigo con personajes de una app.
 
 Lista de interferencias conocidas de Rodrigo, con sus códigos:
@@ -68,7 +77,12 @@ QUÉ DEVUELVES
 4. Dos o tres frases útiles en italiano que salieron en la conversación o que le habrían servido.
 5. Datos nuevos y duraderos que Rodrigo haya contado sobre su vida, en castellano, uno por línea (vacío si no hay).
 6. Un resumen de dos líneas, en castellano, de lo que pasó en la conversación, para la memoria del personaje.
-
+${
+  mission
+    ? `7. Misión de esta etapa: "${mission.mission}". Se cumple si: ${mission.check} Juzga solo lo que dijo Rodrigo, en italiano; los errores pequeños no impiden cumplirla si se le entiende. Pon "cumplida" true o false y un comentario en castellano de 20 palabras como máximo: qué consiguió o qué le faltó.
+`
+    : ""
+}
 REGLAS
 - Solo revisas lo que dijo Rodrigo, nunca lo que dijo el personaje.
 - Si dudas de si algo es un error o un fallo del reconocimiento de voz, no lo cuentes.
@@ -77,7 +91,7 @@ REGLAS
 - Si no estás seguro de una corrección, márcala como dudosa. Prefiere no corregir a corregir mal.
 
 FORMATO DE RESPUESTA: solo este JSON, sin texto antes ni después.
-{"errores":[{"dijo":"","correcto":"","codigo":"","explicacion":"","seguridad":"alta"}],"bien":"","frases_utiles":[""],"datos_nuevos_usuario":[""],"resumen_personaje":""}`;
+{"errores":[{"dijo":"","correcto":"","codigo":"","explicacion":"","seguridad":"alta"}],"bien":"","frases_utiles":[""],"datos_nuevos_usuario":[""],"resumen_personaje":""${mission ? ',"mision":{"cumplida":false,"comentario":""}' : ""}}`;
 }
 
 export function debriefUserMessage(opts: {
