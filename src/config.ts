@@ -6,6 +6,7 @@ export const APP_KEY = "f50deb2218b0ef321acd60f73ca37f9cd79bb28a34a5d144";
 
 export const MODEL_CONVERSATION = "claude-haiku-5-5";
 export const MODEL_DEBRIEF = "claude-sonnet-5-5";
+export const MODEL_ANALYSIS = "claude-sonnet-5-5"; // corrección de cada turno: va en paralelo a la voz, prima la precisión
 
 export const CONVERSATION_MINUTES = 12; // duración objetivo de una conversación
 export const WRAP_UP_MINUTES = 10; // a partir de aquí se avisa al personaje de que cierre

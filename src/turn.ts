@@ -1,5 +1,5 @@
 import { callClaude, parseJson } from "./api";
-import { MODEL_CONVERSATION } from "./config";
+import { MODEL_ANALYSIS } from "./config";
 import { addVocab } from "./db";
 
 /**
@@ -21,7 +21,12 @@ Rodrigo es principiante; su lengua materna es el castellano y piensa en portugu�
 Devuelve solo este JSON, sin texto alrededor:
 {"correzione":null,"parole":[],"immagini":[]}
 
-- correzione: si Rodrigo dijo algo mal o en castellano, {"detto":"el fragmento tal como lo dijo","meglio":"cómo se dice bien en italiano, con el cambio mínimo"}. Elige solo lo más importante. null si está bien o si parece un fallo del reconocimiento de voz.
+- correzione: si Rodrigo dijo algo mal o en castellano, {"detto":"el fragmento tal como lo dijo","meglio":"cómo se dice bien en italiano, con el cambio mínimo"}. Elige solo lo más importante. Reglas:
+  · Antes de corregir, entiende qué quería decir, usando la pregunta que le hicieron. "meglio" debe decir LO MISMO que él quería decir, nunca otra idea.
+  · "detto" es un fragmento corto (2 a 6 palabras) copiado literalmente de su frase; "meglio" cambia solo lo necesario en ese fragmento.
+  · No corrijas lo que ya es correcto en italiano, aunque haya otra forma más natural. No corrijas puntuación, mayúsculas, acentos escritos, registro informal ni usos del sur de Italia.
+  · El reconocimiento de voz se equivoca: si una palabra rara parece una palabra correcta mal transcrita (suena parecido), NO es un error suyo. Ante la duda, null.
+  · Es mejor no corregir que corregir mal.
 - parole: palabras italianas que Rodrigo no sabía (las dijo en castellano) o usó mal. Cada una: {"lemma":"forma base en italiano","emoji":"1 a 3 emoji que la muestren o vacío","wiki":"título exacto de la página de it.wikipedia.org que la ilustra con una foto, o vacío"}.
 - immagini: hasta 3 cosas concretas que se pueden ver (comida, objetos, animales, lugares, acciones claras) mencionadas en la respuesta del personaje y que a un principiante le ayuda ver. Cada una: {"parola":"la palabra tal como aparece en la respuesta","lemma":"forma base","emoji":"1 a 3 emoji","wiki":"título exacto de it.wikipedia o vacío"}. No incluyas palabras abstractas ni muy básicas (ciao, sì, bene).
 Nunca escribas nada en castellano en los campos italianos.`;
@@ -54,11 +59,16 @@ export async function wikiImage(title: string): Promise<string | undefined> {
   }
 }
 
-export async function analyzeTurn(userText: string, reply: string): Promise<TurnAnalysis> {
+export async function analyzeTurn(userText: string, reply: string, asked = ""): Promise<TurnAnalysis> {
   const text = await callClaude({
-    model: MODEL_CONVERSATION,
+    model: MODEL_ANALYSIS,
     systemStatic: SYSTEM,
-    messages: [{ role: "user", content: `Rodrigo ha dicho: ${userText}\n\nEl personaje ha respondido: ${reply}` }],
+    messages: [
+      {
+        role: "user",
+        content: `${asked ? `El personaje le había dicho: ${asked}\n\n` : ""}Rodrigo ha dicho: ${userText}\n\nEl personaje ha respondido: ${reply}`,
+      },
+    ],
     maxTokens: 500,
   });
   const raw = parseJson<Raw>(text);

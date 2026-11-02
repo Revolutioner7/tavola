@@ -2,6 +2,13 @@
 
 App para practicar italiano hablado con cuatro personajes de una familia inventada de Leverano.
 
+## Versión 0.7.1 (actualización por el aire)
+
+- La voz ya no lee emojis, asteriscos ni acotaciones.
+- Fin de turno por silencio: la app aprende el ruido de fondo de la sala (antes, con ruido, tardaba mucho en darte por terminado), espera más si la frase se ha quedado a medias («sono andato a…», «ehm…») y, como tope, envía a los 3,5 segundos sin palabras nuevas.
+- Correcciones más precisas: las hace un modelo más fino (Sonnet), tienen en cuenta la pregunta que te hicieron, no corrigen lo que ya está bien ni lo que parece un fallo del reconocimiento de voz, y en la respuesta del personaje solo se subraya el trozo exacto que repite tu frase corregida.
+- El reconocimiento de voz conoce los nombres de la familia y del pueblo.
+
 ## Versión 0.7.0 (app nueva)
 
 - App nueva para instalar: las actualizaciones por el aire no llegaban al iPhone porque el canal «preview» no estaba conectado a la rama «preview» en Expo (ya está conectado).

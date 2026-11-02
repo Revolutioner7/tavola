@@ -78,8 +78,24 @@ function deviceSpeak(text: string, opts: SpeakOpts, mySession: number, onEnd: ()
   });
 }
 
-export async function speak(text: string, opts: SpeakOpts) {
+/** Quita emojis, asteriscos y acotaciones para que la voz no los lea. */
+export function speakable(text: string): string {
+  return text
+    .replace(/\p{Extended_Pictographic}|\p{Regional_Indicator}|[\u{FE0F}\u{200D}\u{20E3}\u{1F3FB}-\u{1F3FF}]/gu, "")
+    .replace(/[*_~#]/g, "")
+    .replace(/\([^)]*\)/g, "")
+    .replace(/\s{2,}/g, " ")
+    .replace(/\s+([?!.,;:…])/g, "$1")
+    .trim();
+}
+
+export async function speak(rawText: string, opts: SpeakOpts) {
+  const text = speakable(rawText);
   stopSpeaking();
+  if (!text) {
+    opts.onDone?.();
+    return;
+  }
   const mySession = session;
   const rate = opts.rate ?? 1;
   const finish = () => {

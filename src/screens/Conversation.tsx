@@ -38,9 +38,15 @@ type Props = {
 type Phase = "thinking" | "speaking" | "listening" | "waiting" | "typing";
 
 const START_TOKEN = "[La conversación empieza ahora. Saluda y abre tú, retomando algo de la última vez si la hubo.]";
-const SILENCE_TO_SEND_MS = 1500; // tiempo sin palabras nuevas tras el que se da tu turno por terminado
+const SILENCE_TO_SEND_MS = 1800; // tiempo sin palabras nuevas tras el que se da tu turno por terminado
 const QUIET_MS = 1000; // y además el micrófono no oye voz desde hace este tiempo
-const VOICE_LEVEL = 1.5; // nivel del micrófono (de -2 a 10) a partir del cual se considera que hablas
+const MID_SENTENCE_EXTRA_MS = 1700; // más paciencia si la frase se ha quedado a medias ("sono andato a...")
+const MAX_SILENCE_MS = 3500; // sin palabras nuevas en este tiempo, se envía aunque haya ruido de fondo
+const VOICE_ABOVE_FLOOR = 2; // se considera voz lo que supera el ruido de fondo en esta cantidad
+// Palabras con las que una frase italiana no suele terminar: si es la última, estás pensando cómo seguir
+const UNFINISHED = new Set(
+  "il lo la i gli le un uno una di a da in con su per tra fra e ed o ma che perché quando se come mi ti si ci vi ne ho hai ha abbiamo sono sei è siamo del della dei delle al alla ai alle nel nella dal dalla sul sulla molto più non poi allora quindi cioè ehm eh mm mmm uhm".split(" ")
+);
 const NO_SPEECH_MS = 15000; // si no dices nada en este tiempo, se deja de escuchar
 const NOTE_SIMPLER =
   "[Nota de la app: Rodrigo ha necesitado buscar palabras o escuchar más despacio tu último mensaje. Habla más sencillo y más corto: frases de pocas palabras y vocabulario muy frecuente.]";
@@ -64,6 +70,7 @@ export default function Conversation({ characterId, tappaId, onFinish, onCancel 
   const listenStartedAt = useRef(0);
   const lastResultAt = useRef(0);
   const lastLoudAt = useRef(0);
+  const noiseFloor = useRef<number | null>(null); // nivel de ruido de fondo de la sala, se va ajustando
   const transcript = useRef("");
   const lastSegments = useRef<ExpoSpeechRecognitionResultSegment[] | undefined>(undefined);
   const stats = useRef({ seconds: 0, syllables: 0, words: 0 });
@@ -129,7 +136,11 @@ export default function Conversation({ characterId, tappaId, onFinish, onCancel 
   });
 
   useSpeechRecognitionEvent("volumechange", (event) => {
-    if (event.value > VOICE_LEVEL) lastLoudAt.current = Date.now();
+    const v = event.value;
+    // El suelo baja rápido con los silencios y sube muy despacio, para no confundir tu voz con ruido
+    const floor = noiseFloor.current;
+    noiseFloor.current = floor === null ? v : v < floor ? v : floor + (v - floor) * 0.02;
+    if (v > Math.max(1, (noiseFloor.current ?? -2) + VOICE_ABOVE_FLOOR)) lastLoudAt.current = Date.now();
   });
 
   useSpeechRecognitionEvent("end", () => {
@@ -192,7 +203,8 @@ export default function Conversation({ characterId, tappaId, onFinish, onCancel 
         const said = clean(lastUser.content).trim();
         if (said && said.toLowerCase() !== "aiuto") {
           const idx = next.length - 1;
-          analyzeTurn(said, reply)
+          const asked = [...history].reverse().find((m) => m.role === "assistant");
+          analyzeTurn(said, reply, asked ? clean(asked.content) : "")
             .then((a) => alive.current && setAnalyses((prev) => ({ ...prev, [idx]: a })))
             .catch(() => {});
         }
@@ -239,6 +251,8 @@ export default function Conversation({ characterId, tappaId, onFinish, onCancel 
       continuous: true,
       addsPunctuation: true,
       requiresOnDeviceRecognition: false,
+      contextualStrings:
+        lang === "it" ? ["Nonna", "Lucia", "Tonio", "Chiara", "Marco", "Cosimo", "Leverano", "Lecce", "Salento", "Barcellona", "orecchiette", "Giulia", "Rodrigo"] : undefined,
       iosCategory: { category: "playAndRecord", categoryOptions: ["defaultToSpeaker", "allowBluetooth"], mode: "default" },
       volumeChangeEventOptions: { enabled: true, intervalMillis: 150 },
     });
@@ -247,7 +261,11 @@ export default function Conversation({ characterId, tappaId, onFinish, onCancel 
     silenceTimer.current = setInterval(() => {
       const now = Date.now();
       const quiet = now - lastLoudAt.current > QUIET_MS;
-      if (transcript.current.trim() && lastResultAt.current && now - lastResultAt.current > SILENCE_TO_SEND_MS && quiet) {
+      const text = transcript.current.trim();
+      const lastWord = text.toLowerCase().replace(/[.,;:!?…"']+$/g, "").split(/\s+/).pop() ?? "";
+      const wait = SILENCE_TO_SEND_MS + (UNFINISHED.has(lastWord) ? MID_SENTENCE_EXTRA_MS : 0);
+      const sinceWords = now - lastResultAt.current;
+      if (text && lastResultAt.current && ((sinceWords > wait && quiet) || sinceWords > Math.max(wait + 1200, MAX_SILENCE_MS))) {
         endAction.current = "send";
         stopSilenceTimer();
         ExpoSpeechRecognitionModule.stop();
@@ -391,16 +409,28 @@ export default function Conversation({ characterId, tappaId, onFinish, onCancel 
 
   const clean = (s: string) => s.replace(/\n\n\[(QUEDA POCO|Nota de la app:[^\]]*)\]/g, "").replace(/\n\n\[QUEDA POCO\]/g, "");
   /** Palabras de la respuesta del personaje que forman parte de la reformulación de lo que dijiste. */
-  function isRecastWord(index: number, w: string): boolean {
+  /**
+   * Posiciones de las palabras de la respuesta que repiten bien lo que dijiste mal.
+   * Solo se marca el trozo seguido que coincide con la versión correcta, no palabras sueltas repartidas.
+   */
+  function recastSpan(index: number, tokens: string[]): Set<number> {
+    const out = new Set<number>();
     const better = analyses[index]?.correzione?.meglio;
-    if (!better) return false;
-    const target = cleanWord(w).toLowerCase();
-    if (target.length < 3) return false;
-    return better
-      .toLowerCase()
-      .split(/\s+/)
-      .map((x) => cleanWord(x))
-      .includes(target);
+    if (!better) return out;
+    const target = better.toLowerCase().split(/\s+/).map((x) => cleanWord(x)).filter(Boolean);
+    const words = tokens.map((t, j) => ({ j, w: /\s+/.test(t) ? "" : cleanWord(t).toLowerCase() })).filter((x) => x.w);
+    let best: { start: number; len: number } = { start: 0, len: 0 };
+    for (let a = 0; a < words.length; a++) {
+      for (let b = 0; b < target.length; b++) {
+        let len = 0;
+        while (a + len < words.length && b + len < target.length && words[a + len].w === target[b + len]) len++;
+        if (len > best.len) best = { start: a, len };
+      }
+    }
+    // Una sola palabra solo cuenta si la corrección era de una palabra y no es muy corta
+    const enough = best.len >= 2 || (best.len === 1 && target.length === 1 && target[0].length >= 3);
+    if (enough) for (let k = 0; k < best.len; k++) out.add(words[best.start + k].j);
+    return out;
   }
 
   const mm = String(Math.floor(elapsed / 60)).padStart(2, "0");
@@ -444,7 +474,10 @@ export default function Conversation({ characterId, tappaId, onFinish, onCancel 
           ) : (
             <View key={i} style={[styles.bubble, styles.charBubble, { borderLeftColor: character.color }]}>
               <Text style={styles.bubbleText}>
-                {m.content.split(/(\s+)/).map((w, j) =>
+                {(() => {
+                  const tokens = m.content.split(/(\s+)/);
+                  const recast = recastSpan(i, tokens);
+                  return tokens.map((w, j) =>
                   /\s+/.test(w) ? (
                     w
                   ) : (
@@ -453,13 +486,14 @@ export default function Conversation({ characterId, tappaId, onFinish, onCancel 
                       onPress={() => openWord(w, m.content)}
                       style={[
                         lookup && cleanWord(w) === lookup.word ? styles.wordOn : undefined,
-                        isRecastWord(i, w) ? styles.recastWord : undefined,
+                        recast.has(j) ? styles.recastWord : undefined,
                       ]}
                     >
                       {w}
                     </Text>
                   )
-                )}
+                  );
+                })()}
               </Text>
               {analyses[i]?.visual?.length ? (
                 <View style={styles.visuals}>
