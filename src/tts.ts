@@ -24,16 +24,27 @@ type SpeakOpts = {
   onDone?: () => void;
 };
 
+/**
+ * Parte la respuesta en trozos para que el primero suene enseguida.
+ * Cada trozo lleva al menos 6 palabras: con frases muy cortas («E le verdure?») la voz de Google
+ * no tiene contexto suficiente y a veces las pronuncia como si fueran de otro idioma.
+ */
+const MIN_WORDS = 6;
 export function splitSentences(text: string): string[] {
   const parts = text
     .split(/(?<=[.!?…])\s+/)
     .map((s) => s.trim())
     .filter(Boolean);
-  // Une frases muy cortas con la siguiente para que la voz no suene a trozos
+  const words = (s: string) => s.split(/\s+/).filter(Boolean).length;
   const out: string[] = [];
   for (const p of parts) {
-    if (out.length && out[out.length - 1].length < 12) out[out.length - 1] += ` ${p}`;
+    if (out.length && words(out[out.length - 1]) < MIN_WORDS) out[out.length - 1] += ` ${p}`;
     else out.push(p);
+  }
+  // Si el último trozo se ha quedado corto, va con el anterior
+  if (out.length > 1 && words(out[out.length - 1]) < MIN_WORDS) {
+    const last = out.pop()!;
+    out[out.length - 1] += ` ${last}`;
   }
   return out.length ? out : [text];
 }
