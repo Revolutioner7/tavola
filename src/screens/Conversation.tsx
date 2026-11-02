@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type ScrollViewInstance } from "react-native";
-import { speak as ttsSpeak, stopSpeaking } from "../tts";
+import { markAudioModeDirty, speak as ttsSpeak, stopSpeaking } from "../tts";
 import { cleanWord, explainWord, type WordExplanation } from "../words";
 import { analyzeTurn, type TurnAnalysis } from "../turn";
 import {
@@ -245,6 +245,7 @@ export default function Conversation({ characterId, tappaId, onFinish, onCancel 
     endAction.current = "idle";
     setPhase("listening");
     recognizing.current = true;
+    markAudioModeDirty();
     ExpoSpeechRecognitionModule.start({
       lang: lang === "es" ? "es-ES" : "it-IT",
       interimResults: true,

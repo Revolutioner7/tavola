@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { dueVocab, recordVocabResult, type VocabRow } from "../db";
-import { speak, stopSpeaking } from "../tts";
+import { preloadSpeech, releasePreloaded, speak, stopSpeaking } from "../tts";
 import { colors, gap, radius } from "../theme";
 
 /**
@@ -36,7 +36,18 @@ export default function WordGame({ onBack }: { onBack: () => void }) {
   const roundDone = words.length > 0 && matched.size === words.length;
   const finished = words.length === 0 || (roundDone && (round + 1) * ROUND_SIZE >= pool.length);
 
-  useEffect(() => () => stopSpeaking(), []);
+  useEffect(
+    () => () => {
+      stopSpeaking();
+      releasePreloaded();
+    },
+    []
+  );
+
+  // Descarga la pronunciación de las palabras de esta ronda y de la siguiente para que suene al tocar
+  useEffect(() => {
+    preloadSpeech(pool.slice(round * ROUND_SIZE, (round + 2) * ROUND_SIZE).map((w) => w.lemma), VOICE, 0.9);
+  }, [pool, round]);
 
   function say(w: VocabRow) {
     speak(w.lemma, { googleVoice: VOICE, rate: 0.9 });

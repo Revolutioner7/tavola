@@ -16,6 +16,37 @@ let session = 0; // cada llamada a speak() abre una sesión; stopSpeaking() la i
 let players: AudioPlayer[] = [];
 let subs: { remove: () => void }[] = [];
 let googleFailed = false;
+let audioModeReady = false; // el modo de audio solo se ajusta una vez (o tras usar el micrófono)
+const preloaded = new Map<string, AudioPlayer>(); // audios ya descargados (palabras del juego)
+let activePreloaded: AudioPlayer | null = null;
+const preKey = (text: string, voice: string, rate: number) => `${voice}|${rate.toFixed(2)}|${text}`;
+
+/** Avisar cuando se ha usado el micrófono: después hay que volver a poner el audio en modo altavoz. */
+export function markAudioModeDirty() {
+  audioModeReady = false;
+}
+
+/** Descarga por adelantado el audio de textos cortos (por ejemplo las palabras de una ronda del juego). */
+export function preloadSpeech(texts: string[], voice: string, rate = 1) {
+  if (googleFailed) return;
+  for (const raw of texts) {
+    const text = speakable(raw);
+    const k = preKey(text, voice, rate);
+    if (!text || preloaded.has(k)) continue;
+    preloaded.set(k, createAudioPlayer({ uri: ttsUri(text, voice, rate), headers: { "x-tavola-key": APP_KEY } }));
+  }
+}
+
+/** Libera los audios descargados por adelantado. */
+export function releasePreloaded() {
+  preloaded.forEach((p) => {
+    try {
+      p.remove();
+    } catch {}
+  });
+  preloaded.clear();
+  activePreloaded = null;
+}
 
 type SpeakOpts = {
   googleVoice: string;
@@ -63,6 +94,12 @@ function cleanup() {
     } catch {}
   });
   players = [];
+  if (activePreloaded) {
+    try {
+      activePreloaded.pause();
+    } catch {}
+    activePreloaded = null;
+  }
 }
 
 export function stopSpeaking() {
@@ -120,10 +157,32 @@ export async function speak(rawText: string, opts: SpeakOpts) {
     return;
   }
 
-  try {
-    await setAudioModeAsync({ playsInSilentMode: true, allowsRecording: false, shouldRouteThroughEarpiece: false });
-  } catch {}
-  if (mySession !== session) return;
+  if (!audioModeReady) {
+    try {
+      await setAudioModeAsync({ playsInSilentMode: true, allowsRecording: false, shouldRouteThroughEarpiece: false });
+      audioModeReady = true;
+    } catch {}
+    if (mySession !== session) return;
+  }
+
+  // Audio ya descargado: suena al instante
+  const pre = preloaded.get(preKey(text, opts.googleVoice, rate));
+  if (pre && pre.isLoaded) {
+    activePreloaded = pre;
+    const sub = pre.addListener("playbackStatusUpdate", (st: any) => {
+      if (mySession !== session) return;
+      if (st.didJustFinish) {
+        sub.remove();
+        finish();
+      }
+    });
+    subs.push(sub);
+    try {
+      pre.seekTo(0);
+    } catch {}
+    pre.play();
+    return;
+  }
 
   const sentences = splitSentences(text);
   const make = (i: number) => {

@@ -1,3 +1,4 @@
+import { markAudioModeDirty } from "../tts";
 import React, { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { ExpoSpeechRecognitionModule, useSpeechRecognitionEvent } from "expo-speech-recognition";
@@ -72,6 +73,7 @@ export default function Monologue({ onBack }: { onBack: () => void }) {
 
   function startRecognizer() {
     sessionOffset.current = Date.now() - roundStart.current;
+    markAudioModeDirty();
     ExpoSpeechRecognitionModule.start({
       lang: "it-IT",
       interimResults: true,
