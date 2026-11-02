@@ -3,6 +3,8 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { getSetting, setSetting } from "../db";
 import { hasGoodItalianVoice } from "../voice";
 import { colors, gap, radius } from "../theme";
+import * as Updates from "expo-updates";
+import Constants from "expo-constants";
 
 const LEVELS = ["A1", "A2", "B1", "B2", "C1"];
 
@@ -53,6 +55,11 @@ export default function Settings({ onBack }: { onBack: () => void }) {
           Ajustes del iPhone → Accesibilidad → Contenido leído → Voces → Italiano. Descarga las que pongan «Premium» (o «Mejorada»), una de mujer y una de hombre. Después cierra Tavola del todo y vuelve a abrirla.
         </Text>
       </View>
+
+      <Text style={styles.version}>
+        Tavola {Constants.expoConfig?.version ?? "?"} · {Updates.isEmbeddedLaunch ? "versión de la instalación" : `actualización ${(Updates.updateId ?? "").slice(0, 8)}`}
+        {Updates.createdAt ? ` del ${Updates.createdAt.toLocaleDateString("es-ES")}` : ""} · canal {Updates.channel ?? "–"}
+      </Text>
     </ScrollView>
   );
 }
@@ -77,6 +84,7 @@ const styles = StyleSheet.create({
   content: { padding: gap, paddingTop: 64, paddingBottom: 48, gap: 12 },
   back: { color: colors.accent, fontSize: 16, fontWeight: "600" },
   title: { fontSize: 32, fontWeight: "700", color: colors.ink },
+  version: { fontSize: 12, color: colors.muted, textAlign: "center", marginTop: 8 },
   subtitle: { fontSize: 15, color: colors.muted, lineHeight: 21 },
   card: { backgroundColor: colors.card, borderRadius: radius, padding: 16, gap: 10, borderWidth: 1, borderColor: colors.line },
   label: { fontSize: 13, fontWeight: "700", color: colors.muted, textTransform: "uppercase" },

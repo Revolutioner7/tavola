@@ -2,7 +2,11 @@
 
 App para practicar italiano hablado con cuatro personajes de una familia inventada de Leverano.
 
-## Versión 0.7 (actualización por el aire)
+## Versión 0.7.0 (app nueva)
+
+- App nueva para instalar: las actualizaciones por el aire no llegaban al iPhone porque el canal «preview» no estaba conectado a la rama «preview» en Expo (ya está conectado).
+- En «Mi nivel», abajo del todo, se ve la versión y si estás usando una actualización por el aire o la versión de la instalación.
+
 
 - Recorrido «Il tuo viaggio»: 12 etapas, cada una con una misión de conversación (presentarte, decir qué te gusta comer, explicar un plato, tu barrio, tu trabajo…). El personaje lleva la charla hacia la misión sin decirlo y el repaso final decide si la has cumplido. Si no, puedes intentarlo otra vez.
 - Personajes por desbloquear: al principio solo está Nonna Lucia. Chiara aparece en la etapa 4, Marco en la 7 y Zio Tonio (el más difícil) en la 10. En «Conversación libre» solo salen los que ya conoces.
