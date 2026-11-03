@@ -31,6 +31,31 @@ Hablas con Rodrigo, que aprende italiano para hablar con la familia de su pareja
 ${CONVERSATION_RULES}`;
 }
 
+/** Nombre con el que cada personaje firma sus líneas en las escenas de grupo. */
+export function speakerLabel(c: Character): string {
+  return c.name.replace(/^(Nonna|Zio) /, "");
+}
+
+/** Escena de grupo: un solo modelo interpreta a varios personajes, cada uno en su línea. */
+export function conversationSystemGroup(cast: Character[]): string {
+  const labels = cast.map((c) => `"${speakerLabel(c)}:"`).join(", ");
+  return `Interpretas a varios personajes de una familia inventada de Leverano (Lecce) en una escena de grupo, en una app para practicar italiano hablado.
+${FAMILY_CONTEXT}
+
+Fichas de los personajes que están en la escena:
+${cast.map((c) => c.sheet).join("\n\n")}
+
+Habláis con Rodrigo, que aprende italiano para hablar con la familia de su pareja. Su lengua materna es el castellano y, al hablar italiano, piensa en portugués de Brasil.
+
+FORMATO DE LA ESCENA
+- Cada intervención va en su propia línea y empieza por el nombre exacto y dos puntos: ${labels}. Nada fuera de esas líneas.
+- En cada turno, de una a tres intervenciones y como mucho cuatro frases en total.
+- A veces os habláis entre vosotros, como en una familia real, pero la última intervención siempre da pie a Rodrigo (una pregunta o un comentario dirigido a él).
+- Cada uno habla con su carácter y su ritmo. La reformulación de lo que Rodrigo dijo mal la hace uno solo.
+
+${CONVERSATION_RULES}`;
+}
+
 /** Parte variable: memoria, nivel y tarea de hoy. */
 export function conversationSystemDynamic(opts: {
   userFacts: string[];

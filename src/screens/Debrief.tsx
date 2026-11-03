@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { getCharacter } from "../brain/characters";
-import { characterUnlockedBy, getTappa } from "../brain/path";
+import { charactersUnlockedBy, getStep, hitoOf, HITOS, PLACEMENT, stepsBeforeHito, suggestedHito } from "../brain/path";
 import { findInterference } from "../brain/interferences";
 import { debriefSystem, debriefUserMessage } from "../brain/prompts";
 import { callClaude, parseJson } from "../api";
@@ -12,6 +12,7 @@ import {
   addUsefulPhrases,
   addUserFacts,
   completeTappa,
+  setSetting,
   errorBookForPrompt,
   errorCountByCode,
   finishSession,
@@ -37,14 +38,34 @@ type Props = {
   onNext: () => void;
 };
 
+type Placement = { escuchar: string; hablar: string; comentario: string };
+
+const PLACEMENT_SYSTEM = `Eres examinador de italiano oral (MCER). Te dan la transcripción automática de una conversación de nivel con Rodrigo (castellanohablante que piensa en portugués de Brasil) y cuántas ayudas usó. El personaje empezó en A1 y fue subiendo de escalón cuando Rodrigo respondía bien y bajando cuando no.
+
+Evalúa por separado:
+- escuchar: hasta qué escalón entendió las preguntas (respondió a lo que se le preguntaba). Las ayudas (pedir pistas, escuchar más despacio, tocar palabras) indican que no entendió a la primera.
+- hablar: el escalón más alto en el que respondió de forma comprensible y con cierta corrección (vocabulario, tiempos verbales, longitud de las frases).
+Ignora errores que parezcan del reconocimiento de voz. Ante la duda entre dos niveles, elige el más bajo.
+
+Devuelve solo este JSON: {"escuchar":"A1","hablar":"A1","comentario":""}
+comentario: en castellano, dos frases como máximo: qué ya hace bien y qué le falta para el siguiente nivel.`;
+
 export default function Debrief({ result, onRepeat, onHome, onNext }: Props) {
   const character = getCharacter(result.characterId);
-  const tappa = getTappa(result.tappaId);
+  const step = getStep(result.stepId);
+  const isPlacement = step?.id === PLACEMENT.id;
+  const tappa = step && !isPlacement ? step : undefined; // paso del recorrido con misión
+  const [placement, setPlacement] = useState<Placement | null>(null);
+  const [placementDone, setPlacementDone] = useState<string | null>(null);
   const [data, setData] = useState<DebriefData | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const transcript = result.messages
-    .map((m) => `${m.role === "user" ? "Rodrigo" : character.name}: ${m.content.replace("\n\n[QUEDA POCO]", "")}`)
+    .map((m) => {
+      const text = m.content.replace("\n\n[QUEDA POCO]", "");
+      if (m.role === "user") return `Rodrigo: ${text}`;
+      return (step?.cast.length ?? 1) > 1 ? text : `${character.name}: ${text}`; // en grupo cada línea ya lleva su nombre
+    })
     .join("\n");
 
   async function run() {
@@ -68,6 +89,25 @@ export default function Debrief({ result, onRepeat, onHome, onNext }: Props) {
       addUserFacts(parsed.datos_nuevos_usuario || []);
       addCharacterMemory(result.characterId, parsed.resumen_personaje || "");
       if (tappa && parsed.mision?.cumplida) completeTappa(tappa.id);
+      if (isPlacement) {
+        const h = result.helps;
+        const evalText = await callClaude({
+          model: MODEL_DEBRIEF,
+          systemStatic: PLACEMENT_SYSTEM,
+          messages: [
+            {
+              role: "user",
+              content: `${transcript}\n\nAyudas usadas: pistas "aiuto" ${h.aiuto}, escuchar más despacio ${h.slower}, palabras tocadas ${h.words}, "¿cómo se dice?" ${h.howToSay}.`,
+            },
+          ],
+          maxTokens: 400,
+        });
+        const pl = parseJson<Placement>(evalText);
+        setSetting("level_listening", pl.escuchar);
+        setSetting("level_speaking", pl.hablar);
+        setSetting("placement_done", new Date().toISOString());
+        setPlacement(pl);
+      }
       setData(parsed);
     } catch (e: any) {
       setError(e?.message ?? "No se ha podido hacer el repaso.");
@@ -85,7 +125,7 @@ export default function Debrief({ result, onRepeat, onHome, onNext }: Props) {
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <Text style={styles.title}>Repaso</Text>
-      <Text style={styles.subtitle}>Tu conversación con {character.name}</Text>
+      <Text style={styles.subtitle}>{step ? `${step.emoji} ${step.title}` : `Tu conversación con ${character.name}`}</Text>
 
       <View style={styles.statsRow}>
         <Stat label="Minutos hablando tú" value={minutes} />
@@ -109,15 +149,60 @@ export default function Debrief({ result, onRepeat, onHome, onNext }: Props) {
         </View>
       )}
 
+      {isPlacement && data && !placement && !error && (
+        <View style={styles.loading}>
+          <ActivityIndicator color={colors.accent} />
+          <Text style={styles.muted}>Calculando tu nivel…</Text>
+        </View>
+      )}
+
+      {placement && (
+        <View style={[styles.card, styles.missionCard, styles.missionOk]}>
+          <Text style={styles.missionTitle}>🧭 Tu nivel</Text>
+          <Text style={styles.levelLine}>
+            Escuchar <Text style={styles.levelValue}>{placement.escuchar}</Text>   ·   Hablar <Text style={styles.levelValue}>{placement.hablar}</Text>
+          </Text>
+          {!!placement.comentario && <Text style={styles.body}>{placement.comentario}</Text>}
+          <Text style={styles.muted}>Los personajes ya te hablan a este nivel. Puedes cambiarlo a mano en «Mi nivel».</Text>
+          {placementDone ? (
+            <Text style={styles.unlock}>{placementDone}</Text>
+          ) : suggestedHito(placement.hablar) > 0 ? (
+            <>
+              <Pressable
+                style={styles.primary}
+                onPress={() => {
+                  const n = suggestedHito(placement.hablar);
+                  stepsBeforeHito(n).forEach(completeTappa);
+                  setPlacementDone(`Empiezas en el hito ${n + 1}: ${HITOS[n].title}`);
+                }}
+              >
+                <Text style={styles.primaryText}>
+                  Empezar en el hito {suggestedHito(placement.hablar) + 1}: {HITOS[suggestedHito(placement.hablar)].title}
+                </Text>
+              </Pressable>
+              <Pressable style={styles.ghost} onPress={() => setPlacementDone("Empiezas desde el primer hito.")}>
+                <Text style={styles.ghostText}>Prefiero empezar desde el principio</Text>
+              </Pressable>
+            </>
+          ) : (
+            <Text style={styles.unlock}>Empiezas desde el primer hito.</Text>
+          )}
+        </View>
+      )}
+
       {data && tappa && data.mision && (
         <View style={[styles.card, styles.missionCard, data.mision.cumplida ? styles.missionOk : styles.missionNo]}>
           <Text style={styles.missionTitle}>
-            {data.mision.cumplida ? `🎉 Etapa superada: ${tappa.title}` : `🤏 Casi: ${tappa.title}`}
+            {data.mision.cumplida ? `✅ Superado: ${tappa.title}` : `🤏 Casi: ${tappa.title}`}
           </Text>
           {!!data.mision.comentario && <Text style={styles.body}>{data.mision.comentario}</Text>}
-          {data.mision.cumplida && characterUnlockedBy(tappa.id) && (
-            <Text style={styles.unlock}>Nuevo personaje en tu mesa: {getCharacter(characterUnlockedBy(tappa.id)!).name}</Text>
-          )}
+          {data.mision.cumplida && tappa.kind === "prova" && <Text style={styles.unlock}>Hito conseguido: {hitoOf(tappa.id)?.title} 🎉</Text>}
+          {data.mision.cumplida &&
+            charactersUnlockedBy(tappa.id).map((id) => (
+              <Text key={id} style={styles.unlock}>
+                Nuevo personaje en tu mesa: {getCharacter(id).name}
+              </Text>
+            ))}
         </View>
       )}
 
@@ -173,13 +258,13 @@ export default function Debrief({ result, onRepeat, onHome, onNext }: Props) {
             Las correcciones las hace una IA y pueden equivocarse. Si una te suena rara, márcala como dudosa en el libro de errores y pregúntaselo a Giulia.
           </Text>
 
-          {tappa && data.mision?.cumplida ? (
+          {(tappa && data.mision?.cumplida) || isPlacement ? (
             <Pressable style={styles.primary} onPress={onNext}>
               <Text style={styles.primaryText}>Ver mi recorrido</Text>
             </Pressable>
           ) : (
             <Pressable style={styles.primary} onPress={onRepeat}>
-              <Text style={styles.primaryText}>{tappa ? "Intentar la etapa otra vez" : "Repetir la conversación"}</Text>
+              <Text style={styles.primaryText}>{tappa ? "Intentarlo otra vez" : isPlacement ? "Repetir la prueba" : "Repetir la conversación"}</Text>
             </Pressable>
           )}
           <Pressable style={styles.ghost} onPress={onHome}>
@@ -224,6 +309,8 @@ const styles = StyleSheet.create({
   missionCard: { borderWidth: 2 },
   missionOk: { borderColor: colors.ok },
   missionNo: { borderColor: colors.warn },
+  levelLine: { fontSize: 17, color: colors.ink },
+  levelValue: { fontWeight: "800", color: colors.accent, fontSize: 20 },
   missionTitle: { fontSize: 18, fontWeight: "700", color: colors.ink },
   unlock: { fontSize: 15, fontWeight: "700", color: colors.accent, marginTop: 4 },
   note: { fontSize: 12, color: colors.muted, lineHeight: 17 },

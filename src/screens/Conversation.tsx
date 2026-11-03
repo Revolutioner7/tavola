@@ -8,9 +8,9 @@ import {
   useSpeechRecognitionEvent,
   type ExpoSpeechRecognitionResultSegment,
 } from "expo-speech-recognition";
-import { CharacterId, getCharacter } from "../brain/characters";
-import { getTappa } from "../brain/path";
-import { conversationSystemDynamic, conversationSystemStatic, TaskType } from "../brain/prompts";
+import { Character, CharacterId, getCharacter } from "../brain/characters";
+import { getStep } from "../brain/path";
+import { conversationSystemDynamic, conversationSystemGroup, conversationSystemStatic, speakerLabel, TaskType } from "../brain/prompts";
 import { callClaude, ChatMessage } from "../api";
 import { MODEL_CONVERSATION, WRAP_UP_MINUTES } from "../config";
 import { getCharacterMemory, getSetting, getUserFacts, startSession } from "../db";
@@ -21,8 +21,9 @@ import { colors, gap, radius } from "../theme";
 export type ConversationResult = {
   sessionId: number;
   characterId: CharacterId;
-  tappaId?: string;
+  stepId?: string;
   messages: ChatMessage[];
+  helps: { aiuto: number; slower: number; words: number; howToSay: number };
   userSeconds: number;
   userSyllables: number;
   userWords: number;
@@ -30,7 +31,7 @@ export type ConversationResult = {
 
 type Props = {
   characterId: CharacterId;
-  tappaId?: string;
+  stepId?: string;
   onFinish: (result: ConversationResult) => void;
   onCancel: () => void;
 };
@@ -47,13 +48,36 @@ const VOICE_ABOVE_FLOOR = 2; // se considera voz lo que supera el ruido de fondo
 const UNFINISHED = new Set(
   "il lo la i gli le un uno una di a da in con su per tra fra e ed o ma che perché quando se come mi ti si ci vi ne ho hai ha abbiamo sono sei è siamo del della dei delle al alla ai alle nel nella dal dalla sul sulla molto più non poi allora quindi cioè ehm eh mm mmm uhm".split(" ")
 );
+const AUDIO_MESSAGE_MAX_MS = 120000; // un mensaje de voz se envía solo a los 2 minutos
 const NO_SPEECH_MS = 15000; // si no dices nada en este tiempo, se deja de escuchar
 const NOTE_SIMPLER =
   "[Nota de la app: Rodrigo ha necesitado buscar palabras o escuchar más despacio tu último mensaje. Habla más sencillo y más corto: frases de pocas palabras y vocabulario muy frecuente.]";
 
-export default function Conversation({ characterId, tappaId, onFinish, onCancel }: Props) {
-  const character = getCharacter(characterId);
-  const tappa = getTappa(tappaId);
+/** Parte una respuesta de escena de grupo en intervenciones: "Rosa: ...", "Tonio: ...". */
+function parseScene(text: string, cast: Character[]): { c: Character; text: string }[] {
+  const out: { c: Character; text: string }[] = [];
+  for (const raw of text.split(/\n+/)) {
+    const line = raw.replace(/\*+/g, "").trim();
+    if (!line) continue;
+    const m = line.match(/^([\p{L} ]{2,20}?)\s*:\s*(.+)$/u);
+    const who = m ? cast.find((c) => speakerLabel(c).toLowerCase() === m[1].trim().toLowerCase() || c.name.toLowerCase() === m[1].trim().toLowerCase()) : undefined;
+    if (who) out.push({ c: who, text: m![2].trim() });
+    else if (out.length) out[out.length - 1].text += ` ${line}`;
+    else out.push({ c: cast[0], text: line });
+  }
+  return out.length ? out : [{ c: cast[0], text }];
+}
+
+export default function Conversation({ characterId, stepId, onFinish, onCancel }: Props) {
+  const step = getStep(stepId);
+  const cast = (step?.cast ?? [characterId]).map(getCharacter);
+  const character = cast[0];
+  const group = cast.length > 1;
+  const audioMessage = !!step?.audioMessage;
+  const voiceOnly = !!step?.voiceOnly || audioMessage;
+  const rateBoost = step?.rateBoost ?? 1;
+  const wrapUpMinutes = step?.maxMinutes ? step.maxMinutes * 0.75 : WRAP_UP_MINUTES;
+  const helps = useRef({ aiuto: 0, slower: 0, words: 0, howToSay: 0 });
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [phase, setPhase] = useState<Phase>("thinking");
   const [draft, setDraft] = useState("");
@@ -90,19 +114,19 @@ export default function Conversation({ characterId, tappaId, onFinish, onCancel 
   const scrollRef = useRef<ScrollViewInstance>(null);
 
   const task: TaskType = "fluidez";
-  const systemStatic = conversationSystemStatic(character);
+  const systemStatic = group ? conversationSystemGroup(cast) : conversationSystemStatic(character);
   const systemDynamic = conversationSystemDynamic({
     userFacts: getUserFacts(),
-    characterMemory: getCharacterMemory(characterId),
+    characterMemory: getCharacterMemory(character.id),
     levelListening: getSetting("level_listening", "A1 (estimado)"),
     levelSpeaking: getSetting("level_speaking", "A1 (estimado)"),
     task,
-    mission: tappa?.steer,
+    mission: step?.steer,
   });
 
   useEffect(() => {
     alive.current = true;
-    sessionId.current = startSession(characterId);
+    sessionId.current = startSession(character.id);
     startedAt.current = Date.now();
     const timer = setInterval(() => setElapsed(Math.floor((Date.now() - startedAt.current) / 1000)), 1000);
 
@@ -220,16 +244,24 @@ export default function Conversation({ characterId, tappaId, onFinish, onCancel 
     abortRecognition();
     stopSilenceTimer();
     setPhase("speaking");
-    ttsSpeak(text, {
-      googleVoice: character.googleVoice,
-      deviceVoice: voiceId.current,
-      rate: character.speechRate * speed,
-      onDone: () => {
-        if (!alive.current) return;
+    // En las escenas de grupo, cada intervención con la voz de su personaje, una detrás de otra
+    const parts = group ? parseScene(text, cast) : [{ c: character, text }];
+    const sayPart = (k: number) => {
+      if (!alive.current) return;
+      if (k >= parts.length) {
         if (listenAfter) setTimeout(() => alive.current && startListening(), 80);
         else setPhase("waiting");
-      },
-    });
+        return;
+      }
+      const { c, text: t } = parts[k];
+      ttsSpeak(t, {
+        googleVoice: c.googleVoice,
+        deviceVoice: c.id === character.id ? voiceId.current : undefined,
+        rate: c.speechRate * speed * rateBoost,
+        onDone: () => sayPart(k + 1),
+      });
+    };
+    sayPart(0);
   }
 
   function startListening(lang: "it" | "es" = "it") {
@@ -253,7 +285,7 @@ export default function Conversation({ characterId, tappaId, onFinish, onCancel 
       addsPunctuation: true,
       requiresOnDeviceRecognition: false,
       contextualStrings:
-        lang === "it" ? ["Nonna", "Lucia", "Tonio", "Chiara", "Marco", "Cosimo", "Leverano", "Lecce", "Salento", "Barcellona", "orecchiette", "Giulia", "Rodrigo"] : undefined,
+        lang === "it" ? ["Nonna", "Lucia", "Rosa", "Tonio", "Chiara", "Marco", "Cosimo", "Leverano", "Lecce", "Salento", "Barcellona", "orecchiette", "Giulia", "Rodrigo"] : undefined,
       iosCategory: { category: "playAndRecord", categoryOptions: ["defaultToSpeaker", "allowBluetooth"], mode: "default" },
       volumeChangeEventOptions: { enabled: true, intervalMillis: 150 },
     });
@@ -266,11 +298,20 @@ export default function Conversation({ characterId, tappaId, onFinish, onCancel 
       const lastWord = text.toLowerCase().replace(/[.,;:!?…"']+$/g, "").split(/\s+/).pop() ?? "";
       const wait = SILENCE_TO_SEND_MS + (UNFINISHED.has(lastWord) ? MID_SENTENCE_EXTRA_MS : 0);
       const sinceWords = now - lastResultAt.current;
+      if (audioMessage && lang === "it") {
+        // Mensaje de voz: no se corta por silencio; se envía con el botón o al llegar al máximo
+        if (text && now - listenStartedAt.current > AUDIO_MESSAGE_MAX_MS) {
+          endAction.current = "send";
+          stopSilenceTimer();
+          ExpoSpeechRecognitionModule.stop();
+        }
+        return;
+      }
       if (text && lastResultAt.current && ((sinceWords > wait && quiet) || sinceWords > Math.max(wait + 1200, MAX_SILENCE_MS))) {
         endAction.current = "send";
         stopSilenceTimer();
         ExpoSpeechRecognitionModule.stop();
-      } else if (!transcript.current.trim() && now - listenStartedAt.current > NO_SPEECH_MS) {
+      } else if (!text && now - listenStartedAt.current > NO_SPEECH_MS) {
         endAction.current = "idle";
         stopSilenceTimer();
         ExpoSpeechRecognitionModule.stop();
@@ -288,6 +329,7 @@ export default function Conversation({ characterId, tappaId, onFinish, onCancel 
 
   async function howToSay(es: string) {
     neededHelp.current = true;
+    helps.current.howToSay++;
     setHelperBusy(true);
     setPhase("waiting");
     try {
@@ -330,6 +372,7 @@ export default function Conversation({ characterId, tappaId, onFinish, onCancel 
   }
 
   function askAiuto() {
+    helps.current.aiuto++;
     if (phase === "listening") {
       endAction.current = "aiuto";
       stopSilenceTimer();
@@ -346,13 +389,17 @@ export default function Conversation({ characterId, tappaId, onFinish, onCancel 
       neededHelp.current = false;
     }
     const minutes = (Date.now() - startedAt.current) / 60000;
-    if (minutes >= WRAP_UP_MINUTES) content = `${content}\n\n[QUEDA POCO]`;
+    if (minutes >= wrapUpMinutes) content = `${content}\n\n[QUEDA POCO]`;
     const history = [...messagesRef.current, { role: "user" as const, content }];
     messagesRef.current = history;
     setMessages(history);
     setDraft("");
     setHelper(null);
     void fromVoice;
+    if (audioMessage) {
+      finish(); // el mensaje de voz no tiene respuesta: va directo al repaso
+      return;
+    }
     await characterTurn(history);
   }
 
@@ -361,6 +408,7 @@ export default function Conversation({ characterId, tappaId, onFinish, onCancel 
     const word = cleanWord(raw);
     if (!word) return;
     neededHelp.current = true;
+    helps.current.words++;
     resumeAfterLookup.current = phase === "listening" || phase === "speaking";
     abortRecognition();
     stopSilenceTimer();
@@ -399,8 +447,9 @@ export default function Conversation({ characterId, tappaId, onFinish, onCancel 
     }
     onFinish({
       sessionId: sessionId.current,
-      characterId,
-      tappaId,
+      characterId: character.id,
+      stepId,
+      helps: helps.current,
       messages: messagesRef.current,
       userSeconds: stats.current.seconds,
       userSyllables: stats.current.syllables,
@@ -444,16 +493,18 @@ export default function Conversation({ characterId, tappaId, onFinish, onCancel 
         <Pressable onPress={finish} hitSlop={12}>
           <Text style={styles.headerAction}>Terminar</Text>
         </Pressable>
-        <Text style={styles.headerTitle}>{character.name}</Text>
+        <Text style={styles.headerTitle} numberOfLines={1}>
+          {step ? `${step.emoji} ${step.title}` : character.name}
+        </Text>
         <Text style={styles.timer}>
           {mm}:{ss}
         </Text>
       </View>
-      {tappa && (
+      {step && (
         <View style={styles.mission}>
-          <Text style={styles.missionText}>
-            {tappa.emoji} {tappa.mission}
-          </Text>
+          <Text style={styles.missionText}>{step.mission}</Text>
+          {group && <Text style={styles.missionCast}>{cast.map((c) => c.name).join(" · ")}</Text>}
+          {voiceOnly && <Text style={styles.missionCast}>{audioMessage ? "🎙 Mensaje de voz: escucha y contesta tú solo" : "☎️ Llamada: solo voz, sin texto"}</Text>}
         </View>
       )}
 
@@ -473,30 +524,34 @@ export default function Conversation({ characterId, tappaId, onFinish, onCancel 
               )}
             </View>
           ) : (
-            <View key={i} style={[styles.bubble, styles.charBubble, { borderLeftColor: character.color }]}>
-              <Text style={styles.bubbleText}>
-                {(() => {
-                  const tokens = m.content.split(/(\s+)/);
+            <View key={i} style={[styles.bubble, styles.charBubble, { borderLeftColor: (group ? parseScene(m.content, cast)[0].c : character).color }]}>
+              {voiceOnly ? (
+                <Text style={styles.voiceOnly}>{audioMessage ? "🎙 Messaggio vocale" : "🔊 · · ·"}</Text>
+              ) : (
+                (group ? parseScene(m.content, cast) : [{ c: character, text: m.content }]).map((part, p) => {
+                  const tokens = part.text.split(/(\s+)/);
                   const recast = recastSpan(i, tokens);
-                  return tokens.map((w, j) =>
-                  /\s+/.test(w) ? (
-                    w
-                  ) : (
-                    <Text
-                      key={j}
-                      onPress={() => openWord(w, m.content)}
-                      style={[
-                        lookup && cleanWord(w) === lookup.word ? styles.wordOn : undefined,
-                        recast.has(j) ? styles.recastWord : undefined,
-                      ]}
-                    >
-                      {w}
+                  return (
+                    <Text key={p} style={[styles.bubbleText, p > 0 && { marginTop: 6 }]}>
+                      {group && <Text style={[styles.speaker, { color: part.c.color }]}>{speakerLabel(part.c)}: </Text>}
+                      {tokens.map((w, j) =>
+                        /\s+/.test(w) ? (
+                          w
+                        ) : (
+                          <Text
+                            key={j}
+                            onPress={() => openWord(w, part.text)}
+                            style={[lookup && cleanWord(w) === lookup.word ? styles.wordOn : undefined, recast.has(j) ? styles.recastWord : undefined]}
+                          >
+                            {w}
+                          </Text>
+                        )
+                      )}
                     </Text>
-                  )
                   );
-                })()}
-              </Text>
-              {analyses[i]?.visual?.length ? (
+                })
+              )}
+              {!voiceOnly && analyses[i]?.visual?.length ? (
                 <View style={styles.visuals}>
                   {analyses[i].visual.map((v, k) => (
                     <Pressable key={k} style={styles.visual} onPress={() => openWord(v.parola, m.content)}>
@@ -513,13 +568,14 @@ export default function Conversation({ characterId, tappaId, onFinish, onCancel 
                 <Pressable
                   onPress={() => {
                     neededHelp.current = true;
+                    helps.current.slower++;
                     speak(m.content, 0.7, true);
                   }}
                   hitSlop={8}
                 >
                   <Text style={styles.tool}>🐢 Más despacio</Text>
                 </Pressable>
-                <Text style={styles.toolHint}>Toca una palabra</Text>
+                {!voiceOnly && <Text style={styles.toolHint}>Toca una palabra</Text>}
               </View>
             </View>
           )
@@ -583,19 +639,22 @@ export default function Conversation({ characterId, tappaId, onFinish, onCancel 
               </View>
             )}
             <Text style={styles.status}>
-              {phase === "thinking" && `${character.name.replace("Nonna ", "").replace("Zio ", "")} está pensando…`}
-              {phase === "speaking" && `Habla ${character.name}`}
-              {phase === "listening" && (draft || (listenLang.current === "es" ? "Dilo en castellano…" : "Te escucho… habla cuando quieras"))}
+              {phase === "thinking" && (group ? "Están pensando…" : `${speakerLabel(character)} está pensando…`)}
+              {phase === "speaking" && (group ? "Hablan…" : `Habla ${character.name}`)}
+              {phase === "listening" && audioMessage && !draft && "Grabando tu mensaje… pulsa «Enviar audio» al acabar"}
+              {phase === "listening" && !(audioMessage && !draft) && (draft || (listenLang.current === "es" ? "Dilo en castellano…" : "Te escucho… habla cuando quieras"))}
               {phase === "waiting" && helperBusy && "Preparando cómo se dice…"}
               {phase === "waiting" && !helperBusy && "Toca el micrófono cuando quieras responder"}
             </Text>
             <View style={styles.row}>
-              <Pressable style={styles.ghost} disabled={phase === "thinking" || helperBusy} onPress={startHowToSay}>
-                <Text style={styles.ghostText}>¿Cómo se dice?</Text>
-              </Pressable>
+              {!audioMessage && (
+                <Pressable style={styles.ghost} disabled={phase === "thinking" || helperBusy} onPress={startHowToSay}>
+                  <Text style={styles.ghostText}>¿Cómo se dice?</Text>
+                </Pressable>
+              )}
               {phase === "listening" ? (
                 <Pressable style={[styles.mic, styles.micOn]} onPress={finishTurnNow}>
-                  <Text style={styles.micText}>He terminado</Text>
+                  <Text style={styles.micText}>{audioMessage ? "Enviar audio" : "He terminado"}</Text>
                 </Pressable>
               ) : phase === "speaking" ? (
                 <Pressable style={styles.mic} onPress={() => startListening()}>
@@ -607,7 +666,7 @@ export default function Conversation({ characterId, tappaId, onFinish, onCancel 
                 </Pressable>
               )}
             </View>
-            {(phase === "waiting" || phase === "listening") && lastAssistant && (
+            {!audioMessage && (phase === "waiting" || phase === "listening") && lastAssistant && (
               <View style={styles.links}>
                 <Pressable onPress={askAiuto} hitSlop={8}>
                   <Text style={styles.link}>Aiuto: pista en castellano</Text>
@@ -636,6 +695,9 @@ const styles = StyleSheet.create({
   header: { paddingTop: 60, paddingHorizontal: gap, paddingBottom: 12, flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderBottomWidth: 1, borderBottomColor: colors.line },
   headerAction: { color: colors.accent, fontWeight: "600", fontSize: 16 },
   mission: { backgroundColor: colors.accentSoft, paddingHorizontal: gap, paddingVertical: 10 },
+  missionCast: { fontSize: 12, color: colors.muted, marginTop: 4 },
+  speaker: { fontWeight: "700" },
+  voiceOnly: { fontSize: 17, color: colors.muted, letterSpacing: 1 },
   missionText: { fontSize: 14, lineHeight: 19, color: colors.ink },
   headerTitle: { fontSize: 18, fontWeight: "700", color: colors.ink },
   timer: { fontVariant: ["tabular-nums"], color: colors.muted, fontSize: 16 },

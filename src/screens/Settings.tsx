@@ -8,7 +8,7 @@ import Constants from "expo-constants";
 
 const LEVELS = ["A1", "A2", "B1", "B2", "C1"];
 
-export default function Settings({ onBack }: { onBack: () => void }) {
+export default function Settings({ onBack, onPlacement }: { onBack: () => void; onPlacement: () => void }) {
   const [listening, setListening] = useState(getSetting("level_listening", "A1 (estimado)").slice(0, 2));
   const [speaking, setSpeaking] = useState(getSetting("level_speaking", "A1 (estimado)").slice(0, 2));
 
@@ -24,8 +24,11 @@ export default function Settings({ onBack }: { onBack: () => void }) {
       </Pressable>
       <Text style={styles.title}>Mi nivel</Text>
       <Text style={styles.subtitle}>
-        Hasta que esté la prueba de nivel, elige a ojo. Los personajes ajustan su italiano a tu nivel de escucha.
+        Los personajes ajustan su italiano a tu nivel de escucha. La prueba de nivel lo calcula sola; aquí puedes cambiarlo a mano.
       </Text>
+      <Pressable style={styles.placementBtn} onPress={onPlacement}>
+        <Text style={styles.placementText}>🧭 {getSetting("placement_done", "") ? "Repetir la prueba de nivel" : "Hacer la prueba de nivel"} · 5 min</Text>
+      </Pressable>
 
       <LevelPicker
         label="Escuchar"
@@ -84,6 +87,8 @@ const styles = StyleSheet.create({
   content: { padding: gap, paddingTop: 64, paddingBottom: 48, gap: 12 },
   back: { color: colors.accent, fontSize: 16, fontWeight: "600" },
   title: { fontSize: 32, fontWeight: "700", color: colors.ink },
+  placementBtn: { borderRadius: radius, borderWidth: 1.5, borderColor: colors.accent, padding: 14, alignItems: "center" },
+  placementText: { color: colors.accent, fontWeight: "700", fontSize: 15 },
   version: { fontSize: 12, color: colors.muted, textAlign: "center", marginTop: 8 },
   subtitle: { fontSize: 15, color: colors.muted, lineHeight: 21 },
   card: { backgroundColor: colors.card, borderRadius: radius, padding: 16, gap: 10, borderWidth: 1, borderColor: colors.line },

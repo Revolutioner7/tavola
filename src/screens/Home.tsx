@@ -1,8 +1,8 @@
 import React, { useMemo } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { CHARACTERS, CharacterId, getCharacter } from "../brain/characters";
-import { TAPPE, currentIndex, unlockedCharacters } from "../brain/path";
-import { recentSessions, openErrors, dueVocabCount, dueVocabAnyCount, completedTappe } from "../db";
+import { HITOS, STEPS, currentIndex, hitoOf, hitosDone, unlockedCharacters } from "../brain/path";
+import { recentSessions, openErrors, dueVocabCount, dueVocabAnyCount, completedTappe, getSetting } from "../db";
 import { syllablesPerMinute } from "../fluency";
 import { colors, gap, radius } from "../theme";
 
@@ -13,10 +13,11 @@ type Props = {
   onCloze: () => void;
   onErrors: () => void;
   onSettings: () => void;
+  onJourney: () => void;
 };
 
-export default function Home({ onStart, onMonologue, onGame, onCloze, onErrors, onSettings }: Props) {
-  const { weekCount, lastRate, minutesWeek, openCount, dueWords, dueAny, current, unlocked } = useMemo(() => {
+export default function Home({ onStart, onMonologue, onGame, onCloze, onErrors, onSettings, onJourney }: Props) {
+  const { weekCount, lastRate, minutesWeek, openCount, dueWords, dueAny, current, unlocked, hitos, placementDone } = useMemo(() => {
     const done = completedTappe();
     const sessions = recentSessions(50);
     const weekAgo = Date.now() - 7 * 24 * 3600 * 1000;
@@ -31,6 +32,8 @@ export default function Home({ onStart, onMonologue, onGame, onCloze, onErrors, 
       dueAny: dueVocabAnyCount(),
       current: currentIndex(done),
       unlocked: unlockedCharacters(done),
+      hitos: hitosDone(done),
+      placementDone: !!getSetting("placement_done", ""),
     };
   }, []);
 
@@ -45,38 +48,46 @@ export default function Home({ onStart, onMonologue, onGame, onCloze, onErrors, 
         <Stat label="Sílabas por minuto" value={lastRate ? `${lastRate}` : "–"} />
       </View>
 
-      <Text style={styles.section}>Il tuo viaggio · {Math.min(current, TAPPE.length)} / {TAPPE.length}</Text>
-      <View style={styles.path}>
-        {TAPPE.map((t, i) => {
-          const done = i < current;
-          const isCurrent = i === current;
-          const known = unlocked.includes(t.characterId);
-          const who = known ? getCharacter(t.characterId) : undefined;
-          const step = (
-            <View style={[styles.step, isCurrent && styles.stepCurrent, !done && !isCurrent && styles.stepLocked]}>
-              <View style={[styles.dot, { backgroundColor: done ? colors.ok : isCurrent ? who?.color ?? colors.accent : colors.line }]}>
-                <Text style={styles.dotText}>{done ? "✓" : isCurrent ? t.emoji : "🔒"}</Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.stepTitle, !done && !isCurrent && { color: colors.muted }]}>{done || isCurrent ? t.title : `Etapa ${i + 1}`}</Text>
-                <Text style={styles.stepWho}>{who ? who.name : "Personaje por descubrir"}</Text>
-                {isCurrent && <Text style={styles.stepMission}>{t.mission}</Text>}
-                {isCurrent && <Text style={styles.stepGo}>Empezar ›</Text>}
-              </View>
+      {!placementDone && (
+        <Pressable style={({ pressed }) => [styles.placement, pressed && styles.pressed]} onPress={() => onStart("chiara", "placement")}>
+          <Text style={styles.gameTitle}>🧭 Prueba de nivel · 5 minutos</Text>
+          <Text style={styles.gameText}>Una conversación que empieza muy fácil y va subiendo. Ajusta cómo te hablan los personajes y te dice en qué hito empezar.</Text>
+        </Pressable>
+      )}
+
+      <Text style={styles.section}>La famiglia di Giulia · {hitos} / {HITOS.length} hitos</Text>
+      {current < STEPS.length ? (
+        (() => {
+          const st = STEPS[current];
+          const h = hitoOf(st.id)!;
+          const n = HITOS.indexOf(h) + 1;
+          return (
+            <View style={styles.hito}>
+              <Text style={styles.hitoNum}>Hito {n}</Text>
+              <Text style={styles.hitoTitle}>
+                {h.emoji} {h.title}
+              </Text>
+              <Text style={styles.hitoSituation}>{h.situation}</Text>
+              <Pressable style={({ pressed }) => [styles.stepCard, pressed && styles.pressed]} onPress={() => onStart(st.cast[0], st.id)}>
+                <Text style={styles.stepKind}>{st.kind === "prep" ? "Entrenamiento" : "Prueba del hito"}</Text>
+                <Text style={styles.stepTitle}>
+                  {st.emoji} {st.title}
+                </Text>
+                <Text style={styles.stepMission}>{st.mission}</Text>
+                <Text style={styles.stepGo}>Empezar ›</Text>
+              </Pressable>
+              <Pressable onPress={onJourney} hitSlop={8}>
+                <Text style={styles.journeyLink}>Ver todo el recorrido ›</Text>
+              </Pressable>
             </View>
           );
-          // Solo se muestran las etapas hechas, la actual y las dos siguientes
-          if (i > current + 2) return null;
-          return isCurrent ? (
-            <Pressable key={t.id} onPress={() => onStart(t.characterId, t.id)} style={({ pressed }) => pressed && styles.pressed}>
-              {step}
-            </Pressable>
-          ) : (
-            <View key={t.id}>{step}</View>
-          );
-        })}
-        {current >= TAPPE.length && <Text style={styles.stepMission}>Has terminado el recorrido. Benvenuto in famiglia! 🇮🇹</Text>}
-      </View>
+        })()
+      ) : (
+        <Pressable style={styles.hito} onPress={onJourney}>
+          <Text style={styles.hitoTitle}>Benvenuto in famiglia! 🇮🇹</Text>
+          <Text style={styles.hitoSituation}>Has superado los diez hitos. Sigue charlando con quien quieras.</Text>
+        </Pressable>
+      )}
 
       <Pressable style={({ pressed }) => [styles.drill, pressed && styles.pressed]} onPress={onMonologue}>
         <Text style={styles.drillTitle}>Cuéntaselo a Nonna</Text>
@@ -101,7 +112,7 @@ export default function Home({ onStart, onMonologue, onGame, onCloze, onErrors, 
       {CHARACTERS.filter((c) => unlocked.includes(c.id)).map((c) => (
         <Pressable key={c.id} style={({ pressed }) => [styles.card, pressed && styles.pressed]} onPress={() => onStart(c.id)}>
           <View style={[styles.avatar, { backgroundColor: c.color }]}>
-            <Text style={styles.avatarText}>{c.name.replace("Nonna ", "").replace("Zio ", "")[0]}</Text>
+            <Text style={styles.avatarText}>{c.name.replace("Nonna ", "")[0]}</Text>
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.name}>
@@ -150,6 +161,14 @@ const styles = StyleSheet.create({
   gameTitle: { fontSize: 17, fontWeight: "700", color: colors.ink },
   gameText: { fontSize: 14, color: colors.muted },
   section: { fontSize: 13, fontWeight: "700", color: colors.muted, textTransform: "uppercase", letterSpacing: 0.5, marginTop: 4 },
+  placement: { backgroundColor: colors.card, borderRadius: radius, padding: 16, gap: 4, borderWidth: 2, borderColor: colors.accent },
+  hito: { backgroundColor: colors.card, borderRadius: radius, padding: 16, gap: 6, borderWidth: 1, borderColor: colors.line },
+  hitoNum: { fontSize: 12, fontWeight: "700", color: colors.accent, textTransform: "uppercase", letterSpacing: 0.5 },
+  hitoTitle: { fontSize: 20, fontWeight: "700", color: colors.ink },
+  hitoSituation: { fontSize: 14, color: colors.muted, lineHeight: 20 },
+  stepCard: { marginTop: 6, borderRadius: radius, borderWidth: 2, borderColor: colors.accent, padding: 14, gap: 2 },
+  stepKind: { fontSize: 12, fontWeight: "700", color: colors.muted, textTransform: "uppercase" },
+  journeyLink: { color: colors.accent, fontWeight: "600", fontSize: 15, marginTop: 6 },
   path: { gap: 8 },
   step: { flexDirection: "row", gap: 12, alignItems: "flex-start", backgroundColor: colors.card, borderRadius: radius, padding: 12, borderWidth: 1, borderColor: colors.line },
   stepCurrent: { borderWidth: 2, borderColor: colors.accent, padding: 14 },

@@ -2,6 +2,15 @@
 
 App para practicar italiano hablado con cuatro personajes de una familia inventada de Leverano.
 
+## Versión 0.8 (actualización por el aire)
+
+- Recorrido nuevo, «La famiglia di Giulia»: diez hitos reales en vez de las 12 etapas. Cada hito tiene un entrenamiento y una prueba: (1) saludo en videollamada, (2) videollamada larga con los padres, (3) mensaje de voz para la suegra, (4) llamada solo de voz, (5) llegada a casa, (6) la comida del domingo, (7) paseo con el hermano, (8) en la cocina con la suegra, (9) la sobremesa, (10) conversación larga con la abuela.
+- Pantalla del recorrido completo («Ver todo el recorrido»), con los hitos superados, el actual y los que quedan.
+- Los personajes son ahora la familia de Giulia: la abuela Lucia, sus padres Rosa (nueva) y Tonio, su hermano Marco y su prima Chiara. Se desbloquean a medida que aparecen en el recorrido.
+- Escenas de grupo: varios personajes en la misma conversación, cada uno con su voz, que también hablan entre ellos.
+- Llamada solo de voz (no se ve el texto) y mensaje de voz (hablas tú solo, sin ayudas, y se envía con «Enviar audio»).
+- Prueba de nivel: 5 minutos con Chiara, que empieza muy fácil y va subiendo. Calcula tu nivel de escucha y de habla, ajusta cómo te hablan los personajes y te propone en qué hito empezar. Está en el inicio y en «Mi nivel».
+
 ## Versión 0.7.1 (actualización por el aire)
 
 - La voz ya no lee emojis, asteriscos ni acotaciones.

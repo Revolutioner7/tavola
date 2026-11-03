@@ -12,10 +12,12 @@ import Settings from "./src/screens/Settings";
 import Monologue from "./src/screens/Monologue";
 import WordGame from "./src/screens/WordGame";
 import ClozeGame from "./src/screens/ClozeGame";
+import Journey from "./src/screens/Journey";
 
 type Route =
   | { name: "home" }
-  | { name: "conversation"; characterId: CharacterId; tappaId?: string; key: number }
+  | { name: "conversation"; characterId: CharacterId; stepId?: string; key: number }
+  | { name: "journey" }
   | { name: "debrief"; result: ConversationResult }
   | { name: "errors" }
   | { name: "settings" }
@@ -36,13 +38,13 @@ export default function App() {
     setHomeKey((k) => k + 1); // refresca las estadísticas del inicio
     setRoute({ name: "home" });
   };
-  const startConversation = (characterId: CharacterId, tappaId?: string) => setRoute({ name: "conversation", characterId, tappaId, key: Date.now() });
+  const startConversation = (characterId: CharacterId, stepId?: string) => setRoute({ name: "conversation", characterId, stepId, key: Date.now() });
 
   let screen: React.ReactNode;
   switch (route.name) {
     case "home":
       screen = (
-        <Home key={homeKey} onStart={startConversation} onMonologue={() => setRoute({ name: "monologue", key: Date.now() })} onGame={() => setRoute({ name: "game", key: Date.now() })} onCloze={() => setRoute({ name: "cloze", key: Date.now() })} onErrors={() => setRoute({ name: "errors" })} onSettings={() => setRoute({ name: "settings" })} />
+        <Home key={homeKey} onStart={startConversation} onMonologue={() => setRoute({ name: "monologue", key: Date.now() })} onGame={() => setRoute({ name: "game", key: Date.now() })} onCloze={() => setRoute({ name: "cloze", key: Date.now() })} onErrors={() => setRoute({ name: "errors" })} onSettings={() => setRoute({ name: "settings" })} onJourney={() => setRoute({ name: "journey" })} />
       );
       break;
     case "conversation":
@@ -50,26 +52,29 @@ export default function App() {
         <Conversation
           key={route.key}
           characterId={route.characterId}
-          tappaId={route.tappaId}
+          stepId={route.stepId}
           onFinish={(result) => setRoute({ name: "debrief", result })}
           onCancel={goHome}
         />
       );
       break;
     case "debrief":
-      screen = <Debrief result={route.result} onRepeat={() => startConversation(route.result.characterId, route.result.tappaId)} onHome={goHome} onNext={goHome} />;
+      screen = <Debrief result={route.result} onRepeat={() => startConversation(route.result.characterId, route.result.stepId)} onHome={goHome} onNext={goHome} />;
       break;
     case "errors":
       screen = <ErrorBook onBack={goHome} />;
       break;
     case "settings":
-      screen = <Settings onBack={goHome} />;
+      screen = <Settings onBack={goHome} onPlacement={() => startConversation("chiara", "placement")} />;
       break;
     case "monologue":
       screen = <Monologue key={route.key} onBack={goHome} />;
       break;
     case "game":
       screen = <WordGame key={route.key} onBack={goHome} />;
+      break;
+    case "journey":
+      screen = <Journey onBack={goHome} onStart={startConversation} />;
       break;
     case "cloze":
       screen = <ClozeGame key={route.key} onBack={goHome} />;

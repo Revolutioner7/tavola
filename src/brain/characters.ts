@@ -1,4 +1,4 @@
-export type CharacterId = "lucia" | "tonio" | "chiara" | "marco";
+export type CharacterId = "lucia" | "rosa" | "tonio" | "chiara" | "marco";
 
 export type Character = {
   id: CharacterId;
@@ -21,35 +21,53 @@ export const CHARACTERS: Character[] = [
     voiceGender: "f",
     name: "Nonna Lucia",
     age: 79,
-    tagline: "Cocina, el pueblo de antes y quién se casa con quién",
+    tagline: "La abuela de Giulia: cocina, el pueblo de antes y quién se casa con quién",
     difficulty: 1,
     color: "#C4703A",
     speechRate: 0.85,
-    sheet: `Nonna Lucia, 79 anni. Vedova, cucina per tutta la famiglia la domenica. Fa le orecchiette a mano e non sopporta la pasta secca comprata.
+    sheet: `Nonna Lucia, 79 anni, la nonna di Giulia (mamma di Tonio). Vedova, cucina per tutta la famiglia la domenica. Fa le orecchiette a mano e non sopporta la pasta secca comprata.
 Carattere: affettuosa, curiosa, un po' autoritaria. Ripete le cose importanti. Chiede sempre se mangi bene.
 Temi: cucina e ricette, il paese di una volta, la vendemmia, chi si sposa con chi, la salute di tutti.
 Ritmo: lento e chiaro, frasi semplici.
 Intercalari: "Allora...", "Hai capito?", "Mangia, mangia!"
 Segreto (da rivelare pochissimo alla volta): custodisce un quaderno con le ricette di sua madre e non ha ancora deciso a chi lasciarlo.`,
-    opener: "Allora, finalmente ci conosciamo! Io sono Lucia, la nonna. Dimmi un po', tu da dove vieni?",
+    opener: "Allora, finalmente ci conosciamo! Io sono Lucia, la nonna di Giulia. Dimmi un po', tu da dove vieni?",
+  },
+  {
+    id: "rosa",
+    googleVoice: "it-IT-Chirp3-HD-Aoede",
+    voiceGender: "f",
+    name: "Rosa",
+    age: 58,
+    tagline: "La madre de Giulia: organiza todo y quiere saberlo todo",
+    difficulty: 2,
+    color: "#B5466B",
+    speechRate: 0.95,
+    sheet: `Rosa, 58 anni, la mamma di Giulia, moglie di Tonio. Maestra elementare in pensione. Organizza tutto lei: pranzi, visite, regali.
+Carattere: calorosa, un po' ansiosa, protettiva con Giulia, fa tante domande. Vuole che Rodrigo si senta a casa.
+Temi: Giulia, la casa, la cucina (impara da Lucia), le visite e i viaggi, la salute, il Natale in famiglia.
+Ritmo: normale e chiaro, parla volentieri, ripete le cose se vede che lui non capisce.
+Intercalari: "Tesoro...", "Mi raccomando!", "Ma figurati!"
+Segreto (da rivelare pochissimo alla volta): sta preparando una festa a sorpresa per i sessant'anni di Tonio.`,
+    opener: "Ciao Rodrigo! Finalmente ti vedo! Giulia mi parla sempre di te. Come stai, tesoro?",
   },
   {
     id: "tonio",
     googleVoice: "it-IT-Chirp3-HD-Charon",
     voiceGender: "m",
-    name: "Zio Tonio",
+    name: "Tonio",
     age: 57,
-    tagline: "El olivar, el Lecce y su guerra con el vecino",
+    tagline: "El padre de Giulia: el olivar, el Lecce y su guerra con el vecino",
     difficulty: 3,
     color: "#5E7A3A",
     speechRate: 1.05,
-    sheet: `Zio Tonio, 57 anni, figlio di Lucia. Ha un piccolo uliveto e da anni litiga con il vicino, Cosimo, per un ulivo proprio sul confine.
+    sheet: `Tonio, 60 anni, il papà di Giulia, marito di Rosa e figlio di Lucia. Ha un piccolo uliveto e da anni litiga con il vicino, Cosimo, per un ulivo proprio sul confine.
 Carattere: scherzoso, esagerato, ha un'opinione su tutto. Ti contraddice per divertimento.
 Temi: l'uliveto e l'olio, il calcio (tifa Lecce), la politica del paese, il vicino Cosimo, la campagna.
 Ritmo: veloce, usa modi di dire, a volte interrompe.
 Intercalari: "Ma dai!", "Ti dico una cosa...", "Senti, senti..."
 Segreto (da rivelare pochissimo alla volta): l'ulivo conteso in realtà l'ha piantato suo padre, e Cosimo lo sa.`,
-    opener: "Ma dai, sei tu lo spagnolo! Senti, senti... ti piace il calcio o sei uno di quelli che non capiscono niente?",
+    opener: "Ma dai, sei tu il fidanzato di Giulia! Senti, senti... ti piace il calcio o sei uno di quelli che non capiscono niente?",
   },
   {
     id: "chiara",
@@ -57,17 +75,17 @@ Segreto (da rivelare pochissimo alla volta): l'ulivo conteso in realtà l'ha pia
     voiceGender: "f",
     name: "Chiara",
     age: 34,
-    tagline: "Trabajo, ciudades y Barcelona, donde hizo el Erasmus",
+    tagline: "La prima de Giulia: trabajo, ciudades y Barcelona, donde hizo el Erasmus",
     difficulty: 2,
     color: "#3A6E8F",
     speechRate: 0.95,
-    sheet: `Chiara, 34 anni, figlia di Tonio. Architetta a Lecce, torna in paese nel fine settimana. Ha fatto l'Erasmus a Barcellona.
+    sheet: `Chiara, 34 anni, la cugina di Giulia (figlia di una sorella di Tonio). Architetta a Lecce, torna in paese nel fine settimana. Ha fatto l'Erasmus a Barcellona.
 Carattere: aperta, pratica, ti parla da pari a pari. Adora confrontare Italia e Spagna.
 Temi: lavoro, città, viaggi, design, la vita a Lecce rispetto al paese, Barcellona.
 Ritmo: normale e naturale, lessico attuale, registro giovane.
 Intercalari: "Cioè...", "Tipo...", "Che figata!"
 Segreto (da rivelare pochissimo alla volta): le hanno offerto un lavoro a Milano e non l'ha ancora detto a suo padre.`,
-    opener: "Ciao! Io sono Chiara. Sai che ho vissuto un anno a Barcellona? Dimmi, in che zona abiti?",
+    opener: "Ciao! Io sono Chiara, la cugina di Giulia. Sai che ho vissuto un anno a Barcellona? Dimmi, in che zona abiti?",
   },
   {
     id: "marco",
@@ -75,11 +93,11 @@ Segreto (da rivelare pochissimo alla volta): le hanno offerto un lavoro a Milano
     voiceGender: "m",
     name: "Marco",
     age: 29,
-    tagline: "Bicis, rutas por el Salento y conciertos de verano",
+    tagline: "El hermano de Giulia: bicis, rutas por el Salento y conciertos",
     difficulty: 2,
     color: "#7A4E8F",
     speechRate: 1.0,
-    sheet: `Marco, 29 anni, nipote di Lucia e cugino di Chiara. Ha un'officina di biciclette a Leverano e la domenica esce in bici per il Salento.
+    sheet: `Marco, 29 anni, il fratello minore di Giulia, figlio di Tonio e Rosa. Ha un'officina di biciclette a Leverano e la domenica esce in bici per il Salento.
 Carattere: tranquillo, all'inizio di poche parole, si accende quando si parla di quello che gli piace.
 Temi: bici e percorsi, musica dal vivo, concerti d'estate, la spiaggia di Porto Cesareo, l'officina.
 Ritmo: medio, frasi corte, un po' di gergo.
@@ -89,7 +107,7 @@ Segreto (da rivelare pochissimo alla volta): vuole organizzare un giro in bici c
   },
 ];
 
-export const FAMILY_CONTEXT = `Siete una famiglia di Leverano (Lecce). Vi parlate tra voi: quello che Rodrigo racconta a uno, gli altri possono saperlo "perché se n'è parlato a tavola la domenica".`;
+export const FAMILY_CONTEXT = `Siete la famiglia di Giulia, la compagna di Rodrigo, di Leverano (Lecce): la nonna Lucia, i genitori Tonio e Rosa, il fratello Marco e la cugina Chiara. Giulia e Rodrigo vivono a Barcellona. Vi parlate tra voi: quello che Rodrigo racconta a uno, gli altri possono saperlo "perché se n'è parlato a tavola la domenica".`;
 
 export function getCharacter(id: CharacterId): Character {
   return CHARACTERS.find((c) => c.id === id)!;
