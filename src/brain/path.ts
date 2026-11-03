@@ -339,15 +339,14 @@ export const PLACEMENT: Step = {
   title: "Prova di livello",
   emoji: "🧭",
   cast: ["chiara"],
-  mission: "Prueba de nivel, unos 5 minutos. Empieza muy fácil y va subiendo. Contesta como puedas y usa las ayudas solo si de verdad las necesitas.",
+  mission: "Prueba de nivel: 5 minutos. Empieza muy fácil y va subiendo. Contesta como puedas y usa las ayudas solo si de verdad las necesitas. Se termina sola.",
   check: "",
   steer: `ESTO ES UNA PRUEBA DE NIVEL. Aquí no se aplica la regla 2 de adaptar tu italiano: lo vas cambiando tú por escalones.
 - Empieza en A1: preguntas muy sencillas (cómo se llama, de dónde es, dónde vive).
 - Cada vez que responda bien, sube un escalón en tu siguiente pregunta: A2 (rutina, qué hizo ayer), B1 (contar una experiencia, planes, una opinión con su razón), B2 (hipótesis: "cosa faresti se...", temas más abstractos), C1 (matices, ironía, temas complejos, más rápido).
 - Si no entiende o responde con errores graves, baja un escalón y vuelve a intentar subir después.
-- Una sola pregunta por turno. Unos 8 a 10 turnos. Habla con la velocidad y el vocabulario del escalón en que estás.
+- Una sola pregunta por turno. La app corta la conversación sola cuando acaba el tiempo: nunca te despidas ni la cierres tú, sigue siempre con otra pregunta. Habla con la velocidad y el vocabulario del escalón en que estás.
 - No reformules sus errores ni le ayudes con la gramática: solo conversa. Nunca digas que es una prueba ni en qué nivel está.`,
-  maxMinutes: 6,
 };
 
 export function getStep(id: string | undefined): Step | undefined {

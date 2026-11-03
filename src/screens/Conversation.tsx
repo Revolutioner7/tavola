@@ -48,6 +48,7 @@ const VOICE_ABOVE_FLOOR = 2; // se considera voz lo que supera el ruido de fondo
 const UNFINISHED = new Set(
   "il lo la i gli le un uno una di a da in con su per tra fra e ed o ma che perché quando se come mi ti si ci vi ne ho hai ha abbiamo sono sei è siamo del della dei delle al alla ai alle nel nella dal dalla sul sulla molto più non poi allora quindi cioè ehm eh mm mmm uhm".split(" ")
 );
+const PLACEMENT_SECONDS = 5 * 60; // la prueba de nivel dura exactamente esto
 const AUDIO_MESSAGE_MAX_MS = 120000; // un mensaje de voz se envía solo a los 2 minutos
 const NO_SPEECH_MS = 15000; // si no dices nada en este tiempo, se deja de escuchar
 const NOTE_SIMPLER =
@@ -76,12 +77,15 @@ export default function Conversation({ characterId, stepId, onFinish, onCancel }
   const audioMessage = !!step?.audioMessage;
   const voiceOnly = !!step?.voiceOnly || audioMessage;
   const rateBoost = step?.rateBoost ?? 1;
-  const wrapUpMinutes = step?.maxMinutes ? step.maxMinutes * 0.75 : WRAP_UP_MINUTES;
+  const isPlacement = step?.id === "placement";
+  // La prueba de nivel no avisa al personaje de que cierre: se corta sola a los 5 minutos
+  const wrapUpMinutes = isPlacement ? Infinity : step?.maxMinutes ? step.maxMinutes * 0.75 : WRAP_UP_MINUTES;
   const helps = useRef({ aiuto: 0, slower: 0, words: 0, howToSay: 0 });
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [phase, setPhase] = useState<Phase>("thinking");
   const [draft, setDraft] = useState("");
   const [elapsed, setElapsed] = useState(0);
+  const hardStopped = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [lookup, setLookup] = useState<{ word: string; sentence: string; data?: WordExplanation; error?: string } | null>(null);
   const resumeAfterLookup = useRef(false);
@@ -148,6 +152,22 @@ export default function Conversation({ characterId, stepId, onFinish, onCancel }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Prueba de nivel: a los 5 minutos se termina en ese mismo momento, sin aviso ni cuenta atrás.
+  // Si estabas a media respuesta, lo que llevabas dicho cuenta para la evaluación.
+  useEffect(() => {
+    if (!isPlacement || hardStopped.current || elapsed < PLACEMENT_SECONDS) return;
+    hardStopped.current = true;
+    const partial = transcript.current.trim();
+    if (recognizing.current && partial) {
+      stats.current.seconds += (Date.now() - listenStartedAt.current) / 1000;
+      stats.current.syllables += countSyllables(partial);
+      stats.current.words += countWords(partial);
+      messagesRef.current = [...messagesRef.current, { role: "user", content: partial }];
+    }
+    finish();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [elapsed]);
 
   // Reconocimiento de voz
   useSpeechRecognitionEvent("result", (event) => {
@@ -496,9 +516,13 @@ export default function Conversation({ characterId, stepId, onFinish, onCancel }
         <Text style={styles.headerTitle} numberOfLines={1}>
           {step ? `${step.emoji} ${step.title}` : character.name}
         </Text>
-        <Text style={styles.timer}>
-          {mm}:{ss}
-        </Text>
+        {isPlacement ? (
+          <View style={{ width: 48 }} />
+        ) : (
+          <Text style={styles.timer}>
+            {mm}:{ss}
+          </Text>
+        )}
       </View>
       {step && (
         <View style={styles.mission}>

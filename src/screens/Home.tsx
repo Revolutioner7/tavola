@@ -2,7 +2,7 @@ import React, { useMemo } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { CHARACTERS, CharacterId, getCharacter } from "../brain/characters";
 import { HITOS, STEPS, currentIndex, hitoOf, hitosDone, unlockedCharacters } from "../brain/path";
-import { recentSessions, openErrors, dueVocabCount, dueVocabAnyCount, completedTappe, getSetting } from "../db";
+import { recentSessions, openErrors, dueVocabCount, dueVocabAnyCount, completedTappe } from "../db";
 import { syllablesPerMinute } from "../fluency";
 import { colors, gap, radius } from "../theme";
 
@@ -17,7 +17,7 @@ type Props = {
 };
 
 export default function Home({ onStart, onMonologue, onGame, onCloze, onErrors, onSettings, onJourney }: Props) {
-  const { weekCount, lastRate, minutesWeek, openCount, dueWords, dueAny, current, unlocked, hitos, placementDone } = useMemo(() => {
+  const { weekCount, lastRate, minutesWeek, openCount, dueWords, dueAny, current, unlocked, hitos } = useMemo(() => {
     const done = completedTappe();
     const sessions = recentSessions(50);
     const weekAgo = Date.now() - 7 * 24 * 3600 * 1000;
@@ -33,7 +33,6 @@ export default function Home({ onStart, onMonologue, onGame, onCloze, onErrors, 
       current: currentIndex(done),
       unlocked: unlockedCharacters(done),
       hitos: hitosDone(done),
-      placementDone: !!getSetting("placement_done", ""),
     };
   }, []);
 
@@ -47,13 +46,6 @@ export default function Home({ onStart, onMonologue, onGame, onCloze, onErrors, 
         <Stat label="Minutos hablados" value={`${minutesWeek}`} />
         <Stat label="Sílabas por minuto" value={lastRate ? `${lastRate}` : "–"} />
       </View>
-
-      {!placementDone && (
-        <Pressable style={({ pressed }) => [styles.placement, pressed && styles.pressed]} onPress={() => onStart("chiara", "placement")}>
-          <Text style={styles.gameTitle}>🧭 Prueba de nivel · 5 minutos</Text>
-          <Text style={styles.gameText}>Una conversación que empieza muy fácil y va subiendo. Ajusta cómo te hablan los personajes y te dice en qué hito empezar.</Text>
-        </Pressable>
-      )}
 
       <Text style={styles.section}>La famiglia di Giulia · {hitos} / {HITOS.length} hitos</Text>
       {current < STEPS.length ? (

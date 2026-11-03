@@ -4,6 +4,8 @@ import { applyUpdateIfAvailable } from "./src/updates";
 import { colors } from "./src/theme";
 import { StatusBar } from "expo-status-bar";
 import { CharacterId } from "./src/brain/characters";
+import { getSetting, setSetting } from "./src/db";
+import Welcome from "./src/screens/Welcome";
 import Home from "./src/screens/Home";
 import Conversation, { ConversationResult } from "./src/screens/Conversation";
 import Debrief from "./src/screens/Debrief";
@@ -23,10 +25,16 @@ type Route =
   | { name: "settings" }
   | { name: "monologue"; key: number }
   | { name: "game"; key: number }
-  | { name: "cloze"; key: number };
+  | { name: "cloze"; key: number }
+  | { name: "welcome" };
 
 export default function App() {
-  const [route, setRoute] = useState<Route>({ name: "home" });
+  // La prueba de nivel se ofrece solo la primera vez que se abre la app; después, solo desde «Mi nivel»
+  const [route, setRoute] = useState<Route>(() => {
+    if (getSetting("placement_done", "") || getSetting("placement_offered", "")) return { name: "home" };
+    setSetting("placement_offered", new Date().toISOString());
+    return { name: "welcome" };
+  });
   const [homeKey, setHomeKey] = useState(0);
   const [updating, setUpdating] = useState(false);
 
@@ -72,6 +80,9 @@ export default function App() {
       break;
     case "game":
       screen = <WordGame key={route.key} onBack={goHome} />;
+      break;
+    case "welcome":
+      screen = <Welcome onStart={() => startConversation("chiara", "placement")} onSkip={goHome} />;
       break;
     case "journey":
       screen = <Journey onBack={goHome} onStart={startConversation} />;

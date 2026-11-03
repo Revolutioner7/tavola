@@ -2,6 +2,11 @@
 
 App para practicar italiano hablado con cuatro personajes de una familia inventada de Leverano.
 
+## Versión 0.8.1 (actualización por el aire)
+
+- Prueba de nivel: se ofrece solo la primera vez que se abre la app (pantalla de bienvenida); después solo desde «Mi nivel». Ya no sale en el inicio.
+- La prueba dura exactamente 5 minutos, sin contador a la vista, y se termina sola en ese momento (si estabas a media respuesta, lo dicho cuenta). El personaje no se despide ni la alarga.
+
 ## Versión 0.8 (actualización por el aire)
 
 - Recorrido nuevo, «La famiglia di Giulia»: diez hitos reales en vez de las 12 etapas. Cada hito tiene un entrenamiento y una prueba: (1) saludo en videollamada, (2) videollamada larga con los padres, (3) mensaje de voz para la suegra, (4) llamada solo de voz, (5) llegada a casa, (6) la comida del domingo, (7) paseo con el hermano, (8) en la cocina con la suegra, (9) la sobremesa, (10) conversación larga con la abuela.
